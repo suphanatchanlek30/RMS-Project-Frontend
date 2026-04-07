@@ -5,3 +5,35 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+
+:root {
+  --primary: #b91c1c;       /* แดง */
+  --primary-soft: #fee2e2;  /* แดงอ่อน */
+  --bg: #ffffff;            /* ขาว */
+  --muted: #f3f4f6;         /* เทาอ่อน */
+  --page-bg: #444444;
+  --panel-bg: #de3d3d;
+  --panel-split-left: #de3d3d;
+  --panel-split-right: #de3d3d;
+  --card-bg: #f3f3f3;
+  --input-bg: #d3d3d3;
+  --button-bg: #d80000;
+  --button-bg-hover: #b70000;
+  --text-on-light: #101010;
+  --background: #ffffff;
+  --foreground: #171717;
+  --color-primary: #b91c1c;
+  --color-primary-hover: #991b1b;
+  --color-bg: #ffffff;
+  --color-muted: #f3f4f6;
+  --color-text: #111827;
+  --color-subtext: #4e525a;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-inter);
+  --font-mono: var(--font-geist-mono);
+}
