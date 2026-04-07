@@ -101,12 +101,24 @@ git checkout dev
 git pull origin dev
 ```
 
+อธิบายสั้น ๆ
+
+- `git checkout main` = สลับไป branch `main`
+- `git pull origin main` = ดึงโค้ดล่าสุดของ `main`
+- `git checkout dev` = สลับไป branch `dev`
+- `git pull origin dev` = อัปเดต `dev` ให้ล่าสุด
+
 ### สร้าง branch งานใหม่
 
 ```bash
 git checkout dev
 git checkout -b feat/login-page
 ```
+
+อธิบายสั้น ๆ
+
+- `git checkout dev` = สลับไป branch `dev` ก่อนเริ่มงาน
+- `git checkout -b feat/login-page` = สร้าง branch งานใหม่จาก `dev` และสลับไปทำงานทันที
 
 ### บันทึกงาน
 
