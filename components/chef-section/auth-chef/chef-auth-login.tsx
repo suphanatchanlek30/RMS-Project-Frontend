@@ -2,24 +2,22 @@
 
 import { CHEF_AUTH_LOGIN_CONTENT } from "@/lib/constants";
 import { ChefAuthCard } from "./chef-auth-card";
-import { ChefAuthHero } from "./chef-auth-hero";
 
 export function ChefAuthLogin() {
   return (
-    <main className="min-h-dvh bg-[linear-gradient(180deg,var(--muted)_0%,var(--bg)_100%)]">
+    <main className="relative min-h-dvh overflow-hidden bg-[#3a090d] [background-image:radial-gradient(rgba(255,255,255,0.03)_1px,transparent_1px),linear-gradient(135deg,#5d1016_0%,#2b060a_100%)] [background-size:3px_3px,100%_100%]">
       <section
-        className="mx-auto grid min-h-dvh w-full max-w-6xl grid-cols-1 items-center gap-6 px-4 py-6 sm:px-6 lg:grid-cols-12 lg:gap-10 lg:px-8"
+        className="mx-auto flex min-h-dvh w-full max-w-6xl items-center justify-center px-4 py-8"
         aria-label="Chef authentication"
       >
-        <ChefAuthHero
-          imagePath={CHEF_AUTH_LOGIN_CONTENT.imagePath}
-          imageAlt={CHEF_AUTH_LOGIN_CONTENT.imageAlt}
-        />
-
-        <div className="flex items-stretch justify-center lg:col-span-5 lg:items-center">
-          <ChefAuthCard content={CHEF_AUTH_LOGIN_CONTENT} />
-        </div>
+        <ChefAuthCard content={CHEF_AUTH_LOGIN_CONTENT} />
       </section>
+
+      <div className="pointer-events-none absolute inset-x-0 bottom-6 hidden items-center justify-center gap-5 text-white/85 md:flex">
+        <span className="h-px w-24 bg-white/55" />
+        <span className="text-sm font-medium tracking-wide">ตามสั่งรถซิ่ง</span>
+        <span className="h-px w-24 bg-white/55" />
+      </div>
     </main>
   );
 }
