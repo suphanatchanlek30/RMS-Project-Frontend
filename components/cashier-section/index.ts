@@ -1,1 +1,0 @@
-export { default as CashierTableGrid } from "./cashier-table-grid";
