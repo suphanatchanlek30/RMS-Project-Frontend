@@ -2,8 +2,11 @@
 
 import { LogOut } from "lucide-react";
 import { CASHIER_NAME } from "@/lib/constants/cashier.constants";
+import { useRouter } from "next/navigation";
 
 export default function CashierHeader() {
+  const router = useRouter();
+
   return (
     <div className="relative">
 
@@ -25,7 +28,10 @@ export default function CashierHeader() {
             {CASHIER_NAME}
           </div>
 
-          <button className="text-white hover:scale-110 transition">
+          <button
+            onClick={() => router.push("/cashier/auth")}
+            className="text-white hover:scale-110 transition"
+          >
             <LogOut size={36} strokeWidth={2} />
           </button>
 
