@@ -28,8 +28,11 @@ export default function CashierTableMenu({ tableId }: { tableId: string }) {
           </button>
 
           <div className="flex flex-col gap-5 mt-12">
-            <button className="bg-[var(--bg)] py-4 rounded-lg text-2xl font-bold shadow">
-              QrCode
+            <button
+                onClick={() => router.push(`/cashier/table/${tableId}/qr`)}
+                className="bg-[var(--bg)] py-4 rounded-lg text-2xl font-bold shadow"
+            >
+            QrCode
             </button>
 
             <button

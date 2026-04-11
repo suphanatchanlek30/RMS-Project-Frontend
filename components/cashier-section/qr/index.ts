@@ -1,0 +1,1 @@
+export { default as CashierQrPage } from "./cashier-qr-page";

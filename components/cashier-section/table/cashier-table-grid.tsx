@@ -25,12 +25,12 @@ export default function CashierTableGrid() {
 
           {/* legend */}
           <div className="flex gap-4 mb-4">
-            <div className="flex items-center gap-2 bg-[var(--input-bg)] px-4 py-1 rounded shadow-md">
+            <div className="flex items-center gap-2 bg-[var(--input-bg)] px-4 py-1 font-semibold rounded shadow-md">
               <span>Available</span>
               <span className="w-5 h-5 bg-green-500 rounded-full"></span>
             </div>
 
-            <div className="flex items-center gap-2 bg-[var(--input-bg)] px-4 py-1 rounded shadow-md">
+            <div className="flex items-center gap-2 bg-[var(--input-bg)] px-4 py-1 font-semibold rounded shadow-md">
               <span>Not Available</span>
               <span className="w-5 h-5 bg-red-500 rounded-full"></span>
             </div>

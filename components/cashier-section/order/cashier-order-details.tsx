@@ -59,18 +59,18 @@ export default function CashierOrderDetails({ tableId }: { tableId: string }) {
     <div className="min-h-screen bg-[var(--bg)]">
       <CashierHeader />
 
-      <div className="flex justify-center items-center mt-16">
-        <div className="bg-[var(--card-bg)] w-[420px] rounded-xl shadow-lg p-6">
+      <div className="flex justify-center mt-5">
+        <div className="bg-[var(--card-bg)] w-[360px] h-[500px] rounded-xl shadow-md p-6 flex flex-col">
 
           {/* table name */}
-          <div className="bg-[var(--input-bg)] px-6 py-1 rounded-md w-fit mb-4 font-semibold">
+          <div className="bg-[var(--bg)] px-6 py-1 rounded-md w-fit mb-4 font-semibold">
             {tableName}
           </div>
 
           {/* pending */}
           <h2 className="font-semibold mb-2">รายการที่ยังไม่ได้ทำ</h2>
 
-          <div className="flex flex-col gap-3 mb-4">
+          <div className="flex flex-col gap-3 mb-4 overflow-y-auto max-h-[150px] pr-1">
             {pending.length > 0 ? (
               pending.map((item, i) => (
                 <CashierOrderItem key={i} item={item} />
@@ -83,7 +83,7 @@ export default function CashierOrderDetails({ tableId }: { tableId: string }) {
           {/* done */}
           <h2 className="font-semibold mb-2">รายการที่เสร็จสิ้น</h2>
 
-          <div className="flex flex-col gap-3 mb-6">
+          <div className="flex flex-col gap-3 mb-6 overflow-y-auto max-h-[150px] pr-1">
             {done.length > 0 ? (
               done.map((item, i) => (
                 <CashierOrderItem key={i} item={item} />
@@ -94,13 +94,14 @@ export default function CashierOrderDetails({ tableId }: { tableId: string }) {
           </div>
 
           {/* back */}
-          <button
-            onClick={() => router.back()}
-            className="bg-[var(--button-bg)] hover:bg-[var(--button-bg-hover)] text-white px-10 py-2 rounded-lg mx-auto block font-semibold"
-          >
+          <div className="mt-auto">
+            <button
+                onClick={() => router.back()}
+                className="bg-[var(--button-bg)] hover:bg-[var(--button-bg-hover)] text-white px-10 py-2 rounded-lg mx-auto block font-semibold"
+            >
             Back
-          </button>
-
+            </button>
+          </div>
         </div>
       </div>
     </div>
