@@ -1,0 +1,1 @@
+export { default as CashierAuthLogin } from "./cashier-auth-login";
