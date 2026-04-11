@@ -6,37 +6,33 @@ import { CASHIER_NAME } from "@/lib/constants/cashier.constants";
 export default function CashierHeader() {
   return (
     <div className="relative">
+
       <div
-        className="px-6 py-5 flex justify-between items-center"
+        className="px-6 py-5 flex justify-between items-center relative"
         style={{
-          background: `
-            linear-gradient(var(--panel-bg), var(--panel-bg)),
-            repeating-linear-gradient(
-              0deg,
-              rgba(255,255,255,0.05) 0px,
-              rgba(255,255,255,0.05) 1px,
-              transparent 1px,
-              transparent 3px
-            ),
-            repeating-linear-gradient(
-              90deg,
-              rgba(0,0,0,0.08) 0px,
-              rgba(0,0,0,0.08) 1px,
-              transparent 1px,
-              transparent 3px
-            )
-          `,
+          backgroundImage: "url('/cashier-section/header-bg.png')",
+          backgroundSize: "cover",
+          backgroundPosition: "center",
         }}
       >
-        <div className="bg-[var(--bg)] text-black px-6 py-2 rounded-lg shadow-md">
-          {CASHIER_NAME}
-        </div>
+        {/* overlay */}
+        <div className="absolute inset-0 bg-red-900/70"></div>
 
-        <button className="text-white hover:scale-110 transition">
-          <LogOut size={36} strokeWidth={2} />
-        </button>
+        {/* content */}
+        <div className="relative z-10 flex justify-between w-full items-center">
+
+          <div className="bg-[var(--bg)] text-black px-6 py-2 rounded-lg shadow-md">
+            {CASHIER_NAME}
+          </div>
+
+          <button className="text-white hover:scale-110 transition">
+            <LogOut size={36} strokeWidth={2} />
+          </button>
+
+        </div>
       </div>
 
+      {/* เส้นล่าง */}
       <div
         className="w-full h-3"
         style={{
