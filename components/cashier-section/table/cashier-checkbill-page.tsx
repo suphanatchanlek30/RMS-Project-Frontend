@@ -70,7 +70,7 @@ export default function CashierCheckBillPage({ tableId }: { tableId: string }) {
 
             <div className="flex flex-col sm:flex-row justify-center gap-6 mt-8">
               <button
-                onClick={() => router.back()}
+                onClick={() => router.push(`/cashier/table/${tableId}/cash`)}
                 className="bg-white px-10 py-3 rounded-3xl text-2xl font-bold shadow-lg"
               >
                 Cash
