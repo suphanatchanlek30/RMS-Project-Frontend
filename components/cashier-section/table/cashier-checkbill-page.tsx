@@ -76,7 +76,7 @@ export default function CashierCheckBillPage({ tableId }: { tableId: string }) {
                 Cash
               </button>
               <button
-                onClick={() => router.push(`/cashier/table/${tableId}/qr`)}
+                onClick={() => router.push(`/cashier/table/${tableId}/qr-payment`)}
                 className="bg-white px-10 py-3 rounded-3xl text-2xl font-bold shadow-lg"
               >
                 Qr Payment
