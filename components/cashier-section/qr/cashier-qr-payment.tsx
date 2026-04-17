@@ -69,6 +69,10 @@ export default function CashierCashPage({ tableId }: { tableId: string }) {
     setPaidText(String(value));
   };
 
+  const handleConfirmPay = () => {
+  router.push(`/cashier/table/${tableId}/payment-success`);
+  };
+
   return (
     <div className="min-h-screen bg-[var(--bg)]">
       <CashierHeader />
@@ -115,8 +119,20 @@ export default function CashierCashPage({ tableId }: { tableId: string }) {
                 className="w-[220px] h-[220px] object-contain"
               />
               <p className="text-lg font-bold">{totalAmount.toFixed(2)} ฿</p>
+
             </div>
+
           </div>
+
+          <div className="flex justify-center mt-6">
+            <button
+                onClick={handleConfirmPay}
+                className="bg-white text-black text-2xl font-bold rounded-3xl px-24 py-4 shadow-lg hover:bg-gray-50 transition-colors"
+              >
+                Confirm pay
+            </button>
+          </div>
+
         </div>
       </div>
     </div>
