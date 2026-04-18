@@ -42,7 +42,10 @@ export default function CashierTableMenu({ tableId }: { tableId: string }) {
               Order Details
             </button>
 
-            <button className="bg-[var(--bg)] py-4 rounded-lg text-2xl font-bold shadow">
+            <button
+              onClick={() => router.push(`/cashier/table/${tableId}/checkbill`)}
+              className="bg-[var(--bg)] py-4 rounded-lg text-2xl font-bold shadow"
+            >
               Check Bills
             </button>
 
