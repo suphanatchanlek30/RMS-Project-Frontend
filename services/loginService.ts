@@ -28,6 +28,9 @@ export interface LoginResponse {
 }
 
 const TOKEN_KEY = "token";
+const ADMIN_TOKEN_KEY = "adminToken";
+const CASHIER_TOKEN_KEY = "cashierToken";
+const CHEF_TOKEN_KEY = "chefToken";
 
 const getLoginErrorMessage = (error: unknown): string => {
   if (isAxiosError(error)) {
@@ -79,6 +82,10 @@ export const loginService = async (values: LoginPayload): Promise<LoginResponse>
       localStorage.setItem(TOKEN_KEY, token);
       if (detectedRole) {
         localStorage.setItem("activeRole", detectedRole);
+
+        if (detectedRole === "ADMIN") localStorage.setItem(ADMIN_TOKEN_KEY, token);
+        if (detectedRole === "CASHIER") localStorage.setItem(CASHIER_TOKEN_KEY, token);
+        if (detectedRole === "CHEF") localStorage.setItem(CHEF_TOKEN_KEY, token);
       }
     }
 

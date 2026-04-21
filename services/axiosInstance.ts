@@ -1,6 +1,9 @@
 import axios, { type InternalAxiosRequestConfig } from "axios";
 
 const TOKEN_KEY = "token";
+const ADMIN_TOKEN_KEY = "adminToken";
+const CASHIER_TOKEN_KEY = "cashierToken";
+const CHEF_TOKEN_KEY = "chefToken";
 const API_BASE_URL = process.env.NEXT_PUBLIC_URL ?? process.env.NEXT_PUBLIC_API_URL ?? "";
 const LOGIN_PATH = process.env.NEXT_PUBLIC_LOGIN_PATH ?? "/auth";
 
@@ -30,7 +33,11 @@ axiosInstance.interceptors.request.use(
   (config) => {
     if (typeof window === "undefined") return config;
 
-    const token = localStorage.getItem(TOKEN_KEY);
+    const token =
+      localStorage.getItem(TOKEN_KEY) ||
+      localStorage.getItem(ADMIN_TOKEN_KEY) ||
+      localStorage.getItem(CASHIER_TOKEN_KEY) ||
+      localStorage.getItem(CHEF_TOKEN_KEY);
     if (token) {
       setAuthorizationHeader(config, token);
     }
@@ -45,6 +52,10 @@ axiosInstance.interceptors.response.use(
   (error) => {
     if (error.response?.status === 401 && typeof window !== "undefined") {
       localStorage.removeItem(TOKEN_KEY);
+      localStorage.removeItem(ADMIN_TOKEN_KEY);
+      localStorage.removeItem(CASHIER_TOKEN_KEY);
+      localStorage.removeItem(CHEF_TOKEN_KEY);
+      localStorage.removeItem("activeRole");
       if (window.location.pathname !== LOGIN_PATH) {
         window.location.href = LOGIN_PATH;
       }
