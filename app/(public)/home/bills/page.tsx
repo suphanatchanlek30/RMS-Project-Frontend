@@ -1,4 +1,3 @@
-// app/(public-session)/bills/page.tsx
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
@@ -30,12 +29,13 @@ export default function BillsPage() {
         return;
       }
 
-      const nextItems = response.data.orders.flatMap((order) =>
-        order.items.map((item) => {
+      const nextItems = (response.data.orders ?? []).flatMap((order) =>
+        (order.items ?? []).map((item) => {
+          const statusUpper = (item.itemStatus ?? "").toUpperCase();
           const normalizedStatus: OrderBillItem["status"] =
-            item.itemStatus.toUpperCase() === "PREPARING"
+            statusUpper === "PREPARING" || statusUpper === "WAITING"
               ? "preparing"
-              : item.itemStatus.toUpperCase() === "READY"
+              : statusUpper === "READY"
                 ? "ready"
                 : "served";
 
@@ -43,7 +43,7 @@ export default function BillsPage() {
             id: `${order.orderId}-${item.orderItemId}`,
             name: item.menuName,
             options: [],
-            price: item.unitPrice * item.quantity,
+            price: (item.unitPrice ?? 0) * (item.quantity ?? 1),
             status: normalizedStatus,
           };
         })
@@ -63,7 +63,6 @@ export default function BillsPage() {
 
   return (
     <main className="flex min-h-screen flex-col bg-white">
-      {/* Header */}
       <div className="flex items-center justify-center px-4 py-3 border-b border-gray-100 relative">
         <button
           type="button"
@@ -79,7 +78,6 @@ export default function BillsPage() {
         <h1 className="text-base font-semibold text-gray-800">ใบเสร็จ</h1>
       </div>
 
-      {/* Bill items */}
       <div className="flex-1 px-4 py-4 space-y-3">
         {errorMessage ? (
           <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">

@@ -70,15 +70,24 @@ export default function AllOrder() {
     if (!response.success || !response.data) {
       setErrorMessage(response.message);
     } else {
-      setOrders(
-        response.data.map((o) => ({
-          id: o.id,
-          tableNumber: o.tableNumber,
-          orderTime: o.orderTime,
-          status: o.status,
-          items: o.items.map((i) => ({ name: i.name, qty: i.qty })),
-        }))
-      );
+      const incoming: OrderItemProps[] = response.data.map((o) => ({
+        id: o.id,
+        tableNumber: o.tableNumber,
+        orderTime: o.orderTime,
+        status: o.status,
+        items: o.items.map((i) => ({ name: i.name, qty: i.qty })),
+      }));
+
+      setOrders((prev) => {
+        // The kitchen API only returns WAITING/PREPARING orders.
+        // Any order previously in state but now absent = completed.
+        // Keep it locally as 'completed' so it stays visible in the Completed tab.
+        const incomingIds = new Set(incoming.map((o) => o.id));
+        const ghostCompleted = prev
+          .filter((o) => !incomingIds.has(o.id))
+          .map((o) => ({ ...o, status: 'completed' as const }));
+        return [...incoming, ...ghostCompleted];
+      });
     }
 
     if (!silent) setIsLoading(false);
@@ -181,7 +190,6 @@ export default function AllOrder() {
                 dotColor="bg-green-500"
               />
             </div>
-
             <div className="text-xs text-gray-400 flex-shrink-0">
               {isRefreshing ? 'กำลังรีเฟรช...' : `อัปเดตทุก ${POLL_INTERVAL_MS / 1000} วิ`}
             </div>

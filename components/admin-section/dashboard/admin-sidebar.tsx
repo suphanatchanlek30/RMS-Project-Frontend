@@ -53,11 +53,6 @@ export function AdminSidebar({ isOpen, activeTab, onTabChange, onClose, onLogout
         </button>
       </div>
 
-      <div className="mb-6 rounded-2xl bg-[#171717] p-4 text-white">
-        <p className="text-xs uppercase tracking-[0.2em] text-white/55">Main</p>
-        <p className="mt-2 text-sm font-medium">Control staff, roles and store access</p>
-      </div>
-
       <nav className="space-y-2">
         {TAB_ITEMS.map((tab) => {
           const Icon = tab.icon;

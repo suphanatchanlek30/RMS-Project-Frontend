@@ -696,6 +696,22 @@ export const adminService = {
     }
   },
 
+  /** GET /api/v1/payments/:paymentId/receipt — preferred receipt lookup */
+  async getReceiptByPaymentId(paymentId: number): Promise<AdminDetailResponse<ReceiptItem>> {
+    try {
+      const response = await axiosInstance.get<AdminDetailResponse<ReceiptItem>>(
+        `${API_PREFIX}/payments/${paymentId}/receipt`,
+        { headers: getAdminHeaders() }
+      );
+      return response.data;
+    } catch (error) {
+      return {
+        success: false,
+        message: getErrorMessage(error, "ดึงใบเสร็จไม่สำเร็จ"),
+      };
+    }
+  },
+
   async getReceipts(params?: { page?: number; limit?: number }): Promise<AdminListResponse<ReceiptItem>> {
     try {
       const response = await axiosInstance.get<AdminListResponse<ReceiptItem>>(`${API_PREFIX}/receipts`, {

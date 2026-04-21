@@ -431,20 +431,28 @@ export function AdminDashboard() {
     event.preventDefault();
     clearAlerts();
 
-    const receiptId = Number(receiptLookupId);
-    if (!receiptId) {
-      setApiError("กรุณากรอก receiptId ให้ถูกต้อง");
+    const numId = Number(receiptLookupId);
+    if (!numId) {
+      setApiError("กรุณากรอก Payment ID หรือ Receipt ID ให้ถูกต้อง");
       return;
     }
 
-    const result = await adminService.getReceiptById(receiptId);
-    if (!result.success || !result.data) {
-      setApiError(result.message);
+    // Try by Payment ID first (preferred endpoint), then fall back to Receipt ID
+    const byPayment = await adminService.getReceiptByPaymentId(numId);
+    if (byPayment.success && byPayment.data) {
+      setReceiptDetail(byPayment.data);
+      setApiMessage(byPayment.message);
       return;
     }
 
-    setReceiptDetail(result.data);
-    setApiMessage(result.message);
+    const byReceipt = await adminService.getReceiptById(numId);
+    if (!byReceipt.success || !byReceipt.data) {
+      setApiError(byReceipt.message || byPayment.message);
+      return;
+    }
+
+    setReceiptDetail(byReceipt.data);
+    setApiMessage(byReceipt.message);
   };
 
   const handleSearchSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -530,6 +538,7 @@ export function AdminDashboard() {
 
     applySelectedEmployee(result.data);
     setApiMessage(result.message);
+    setIsManageModalOpen(false);
     await loadEmployees(employeeQuery);
   };
 
@@ -552,6 +561,7 @@ export function AdminDashboard() {
 
     await loadEmployeeById(selectedEmployee.employeeId);
     setApiMessage(result.message);
+    setIsManageModalOpen(false);
     await loadEmployees(employeeQuery);
   };
 
@@ -1149,7 +1159,7 @@ export function AdminDashboard() {
                   <input
                     value={receiptLookupId}
                     onChange={(event) => setReceiptLookupId(event.target.value)}
-                    placeholder="ค้นหา receiptId"
+                    placeholder="ค้นหา Payment ID / Receipt ID"
                     className="rounded-xl border border-black/10 px-3 py-2 text-sm outline-none focus:border-red-400"
                   />
                   <button type="submit" className="rounded-xl bg-red-800 px-4 py-2 text-sm font-semibold text-white hover:bg-red-900">
@@ -1194,6 +1204,19 @@ export function AdminDashboard() {
           </section>
         </div>
       </div>
+
+      {/* Employee Manage Modal */}
+      <EmployeeManageModal
+        isOpen={isManageModalOpen}
+        selectedEmployee={selectedEmployee}
+        updatePayload={updatePayload}
+        nextEmployeeStatus={nextEmployeeStatus}
+        roles={roles}
+        onClose={() => setIsManageModalOpen(false)}
+        onUpdatePayloadChange={setUpdatePayload}
+        onSubmitUpdate={handleUpdateEmployee}
+        onToggleStatus={handleUpdateEmployeeStatus}
+      />
     </main>
   );
 }

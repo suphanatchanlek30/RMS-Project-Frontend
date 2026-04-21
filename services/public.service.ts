@@ -61,8 +61,8 @@ export interface CustomerOrderStatusData {
   orders: Array<{
     orderId: number;
     orderTime: string;
-    items: CustomerOrderItem[];
-  }>;
+    items: CustomerOrderItem[] | null;
+  }> | null;
 }
 
 export interface VerifyQrData {

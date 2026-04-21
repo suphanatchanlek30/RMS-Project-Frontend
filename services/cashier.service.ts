@@ -91,13 +91,15 @@ export interface CheckoutSummary {
 
 export interface CashierCheckoutResult {
   paymentId: number;
-  receiptId: number;
-  receiptNumber: string;
+  receiptId?: number;
+  receiptNumber?: string;
   sessionId: number;
   sessionStatus: SessionStatus;
   tableId: number;
   tableStatus: TableStatus;
   changeAmount: number;
+  totalAmount?: number;
+  receivedAmount?: number;
 }
 
 export interface SessionCloseResult {
@@ -329,6 +331,21 @@ export const cashierService = {
     }
   },
 
+  /** GET /api/v1/payments/:paymentId/receipt — preferred endpoint for receipt after checkout */
+  async getReceiptByPaymentId(paymentId: number): Promise<CashierServiceResult<ReceiptDetail>> {
+    try {
+      const response = await axiosInstance.get<ApiEnvelope<ReceiptDetail>>(
+        `${API_PREFIX}/payments/${paymentId}/receipt`
+      );
+      return response.data;
+    } catch (error) {
+      return {
+        success: false,
+        message: getErrorMessage(error, "ดึงใบเสร็จไม่สำเร็จ"),
+      };
+    }
+  },
+
   async getOrdersBySession(sessionId: number): Promise<CashierServiceResult<OrderSummaryItem[]>> {
     try {
       const response = await axiosInstance.get<ApiEnvelope<OrderSummaryItem[]>>(`${API_PREFIX}/table-sessions/${sessionId}/orders`);
@@ -407,14 +424,59 @@ export const cashierService = {
     receivedAmount: number;
   }): Promise<CashierServiceResult<CashierCheckoutResult>> {
     try {
-      const response = await axiosInstance.post<ApiEnvelope<CashierCheckoutResult>>(
-        `${API_PREFIX}/cashier/sessions/${payload.sessionId}/checkout`,
+      const response = await axiosInstance.post<unknown>(
+        `${API_PREFIX}/payments`,
         {
+          sessionId: payload.sessionId,
           paymentMethodId: payload.paymentMethodId,
           receivedAmount: payload.receivedAmount,
         }
       );
-      return response.data;
+
+      // Normalize: API may nest data under .data or return flat
+      const raw = response.data as Record<string, unknown>;
+      const data = (raw?.data ?? raw) as Record<string, unknown>;
+
+      // Receipt may be nested under .receipt or flat
+      const receipt = (data?.receipt as Record<string, unknown>) ?? {};
+
+      const result: CashierCheckoutResult = {
+        paymentId: Number(data?.paymentId ?? 0),
+        receiptId: Number(data?.receiptId ?? receipt?.receiptId ?? 0) || undefined,
+        receiptNumber: (data?.receiptNumber ?? receipt?.receiptNumber) as string | undefined,
+        sessionId: Number(data?.sessionId ?? payload.sessionId),
+        sessionStatus: (data?.sessionStatus as SessionStatus) ?? "CLOSED",
+        tableId: Number(data?.tableId ?? 0),
+        tableStatus: (data?.tableStatus as TableStatus) ?? "AVAILABLE",
+        changeAmount: Number(data?.changeAmount ?? 0),
+        totalAmount: Number(data?.totalAmount ?? data?.amount ?? 0) || undefined,
+        receivedAmount: Number(data?.receivedAmount ?? payload.receivedAmount),
+      };
+
+      const success = typeof raw?.success === "boolean" ? raw.success : true;
+      const message = typeof raw?.message === "string" ? raw.message : "ชำระเงินสำเร็จ";
+
+      if (!success) {
+        return { success: false, message };
+      }
+
+      // Fetch receipt via correct endpoint: GET /payments/:id/receipt
+      if (result.paymentId) {
+        try {
+          const rcptRes = await axiosInstance.get<ApiEnvelope<ReceiptDetail>>(
+            `${API_PREFIX}/payments/${result.paymentId}/receipt`
+          );
+          const rcpt = rcptRes.data?.data;
+          if (rcpt?.receiptId) {
+            result.receiptId = rcpt.receiptId;
+            result.receiptNumber = rcpt.receiptNumber;
+          }
+        } catch {
+          // best effort — payment success page falls back to payment data
+        }
+      }
+
+      return { success: true, message, data: result };
     } catch (error) {
       return {
         success: false,
