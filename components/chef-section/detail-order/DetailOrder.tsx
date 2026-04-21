@@ -141,7 +141,7 @@ export default function DetailOrder({ orderId }: { orderId: string }) {
           
           <div className="flex items-center justify-between px-6 py-5 relative z-10">
             <div className="bg-white rounded-md px-8 py-2.5 shadow-sm">
-              <span className="font-bold text-gray-800">{employeeName}</span>
+              <span suppressHydrationWarning className="font-bold text-gray-800">{employeeName}</span>
             </div>
             
             <div className="flex items-center gap-6 text-white mr-2">
