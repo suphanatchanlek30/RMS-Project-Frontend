@@ -1,0 +1,1 @@
+export { default as CashierOrderDetails } from "./cashier-order-details";
