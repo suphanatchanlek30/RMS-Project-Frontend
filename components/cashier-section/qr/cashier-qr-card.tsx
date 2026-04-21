@@ -78,16 +78,24 @@ export default function CashierQrCard({ tableId }: { tableId: string }) {
         <div className="rounded-3xl bg-white/95 p-8 text-left shadow-inner">
           <p className="text-lg font-bold text-red-700">ไม่สามารถแสดง QR ได้</p>
           <p className="mt-2 text-sm text-black/65">{errorMessage}</p>
-          <button
-            onClick={() => router.push(`/cashier/table/${tableId}`)}
-            className="mt-5 rounded-2xl bg-black px-5 py-3 text-sm font-semibold text-white"
-          >
-            กลับไปหน้าโต๊ะ
-          </button>
+          <div className="mt-5 flex flex-wrap gap-3">
+            <button
+              onClick={() => window.location.reload()}
+              className="rounded-2xl bg-red-700 px-5 py-3 text-sm font-semibold text-white"
+            >
+              ลองใหม่
+            </button>
+            <button
+              onClick={() => router.push(`/cashier/table/${tableId}`)}
+              className="rounded-2xl bg-black px-5 py-3 text-sm font-semibold text-white"
+            >
+              กลับไปหน้าโต๊ะ
+            </button>
+          </div>
         </div>
       ) : (
         <>
-          <CashierQrImage qrCodeUrl={qrSession?.qrCodeUrl ?? null} />
+          <CashierQrImage qrCodeUrl={qrSession?.qrCodeUrl ?? null} qrToken={qrSession?.qrToken ?? null} />
           <div className="mt-5 rounded-2xl bg-white/90 px-5 py-4 text-left text-sm text-black shadow-md">
             <div className="flex items-center justify-between gap-4">
               <span className="font-semibold text-black/60">QR Token</span>

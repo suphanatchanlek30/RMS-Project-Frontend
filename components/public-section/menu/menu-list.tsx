@@ -66,6 +66,17 @@ export function MenuList({ items, categories, activeCategoryId, loading }: MenuL
           </section>
         );
       })}
+
+      {activeCategoryId === "all" && categoriesToShow.every((cat) => filteredByCategory(cat.id).length === 0) ? (
+        <section className="mb-2">
+          <h2 className="px-4 py-3 text-base font-bold text-gray-800">เมนูทั้งหมด</h2>
+          <div className="divide-y divide-gray-100">
+            {items.map((item) => (
+              <MenuItemCard key={item.id} item={item} />
+            ))}
+          </div>
+        </section>
+      ) : null}
     </div>
   );
 }

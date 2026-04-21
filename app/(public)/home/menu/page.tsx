@@ -1,7 +1,7 @@
 // app/(public)/home/menu/page.tsx
 "use client";
 
-import { useEffect } from "react";
+import { Suspense, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import { MenuHeader } from "@/components/public-section/menu/menu-header";
 import { RestaurantInfoCard } from "@/components/public-section/menu/restaurant-info-card";
@@ -12,7 +12,7 @@ import { RESTAURANT_INFO } from "@/lib/constants/public-session.constants";
 import { useItems } from "@/hooks/useItems";
 import { publicSession } from "@/services/publicSession";
 
-export default function MenuPage() {
+function MenuPageContent() {
   const searchParams = useSearchParams();
   const {
     items,
@@ -83,5 +83,13 @@ export default function MenuPage() {
         />
       </div>
     </main>
+  );
+}
+
+export default function MenuPage() {
+  return (
+    <Suspense fallback={<main className="flex min-h-screen items-center justify-center bg-white text-sm text-gray-500">กำลังโหลดเมนู...</main>}>
+      <MenuPageContent />
+    </Suspense>
   );
 }

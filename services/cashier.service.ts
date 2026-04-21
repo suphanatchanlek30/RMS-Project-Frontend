@@ -148,6 +148,53 @@ interface CashierServiceResult<T> {
   data?: T;
 }
 
+const asRecord = (value: unknown): Record<string, unknown> | null => {
+  if (!value || typeof value !== "object") return null;
+  return value as Record<string, unknown>;
+};
+
+const normalizeQrSession = (rawValue: unknown, fallbackSessionId: number): QrSession | null => {
+  const raw = asRecord(rawValue);
+  if (!raw) return null;
+
+  const qrToken =
+    typeof raw.qrToken === "string"
+      ? raw.qrToken
+      : typeof raw.token === "string"
+        ? raw.token
+        : typeof raw.qr_session_token === "string"
+          ? raw.qr_session_token
+          : "";
+
+  const resolvedSessionId = Number(raw.sessionId ?? raw.tableSessionId ?? fallbackSessionId);
+  if (!qrToken || Number.isNaN(resolvedSessionId)) return null;
+
+  const qrCodeUrlRaw =
+    typeof raw.qrCodeUrl === "string"
+      ? raw.qrCodeUrl
+      : typeof raw.qrCode === "string"
+        ? raw.qrCode
+        : typeof raw.qrUrl === "string"
+          ? raw.qrUrl
+          : typeof raw.url === "string"
+            ? raw.url
+            : "";
+
+  return {
+    qrSessionId: Number(raw.qrSessionId ?? raw.id ?? 0),
+    sessionId: resolvedSessionId,
+    qrToken,
+    qrCodeUrl: qrCodeUrlRaw,
+    createdAt: typeof raw.createdAt === "string" ? raw.createdAt : undefined,
+    expiredAt:
+      typeof raw.expiredAt === "string"
+        ? raw.expiredAt
+        : typeof raw.expiresAt === "string"
+          ? raw.expiresAt
+          : undefined,
+  };
+};
+
 const getErrorMessage = (error: unknown, fallbackMessage: string) => {
   if (!isAxiosError(error)) return fallbackMessage;
 
@@ -291,8 +338,32 @@ export const cashierService = {
 
   async createQrSession(sessionId: number): Promise<CashierServiceResult<QrSession>> {
     try {
-      const response = await axiosInstance.post<ApiEnvelope<QrSession>>(`${API_PREFIX}/qr-sessions`, { sessionId });
-      return response.data;
+      const response = await axiosInstance.post<unknown>(`${API_PREFIX}/qr-sessions`, {
+        sessionId,
+        tableSessionId: sessionId,
+      });
+
+      const payload = asRecord(response.data);
+      const message = typeof payload?.message === "string" ? payload.message : "สร้าง QR สำเร็จ";
+      const success = typeof payload?.success === "boolean" ? payload.success : true;
+
+      const normalized = normalizeQrSession(
+        payload?.data ?? payload?.qrSession ?? payload?.result ?? payload,
+        sessionId
+      );
+
+      if (normalized) {
+        return {
+          success: true,
+          message,
+          data: normalized,
+        };
+      }
+
+      return {
+        success,
+        message: success ? "ไม่พบข้อมูล QR session ใน response" : message,
+      };
     } catch (error) {
       return {
         success: false,
