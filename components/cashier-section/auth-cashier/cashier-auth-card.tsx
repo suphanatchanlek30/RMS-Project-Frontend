@@ -6,6 +6,12 @@ import CashierAuthInput from "./cashier-auth-input";
 import { CASHIER_AUTH } from "@/lib/constants/cashier-auth.constants";
 import { loginService } from "@/services/loginService";
 
+const ROLE_REDIRECT_MAP = {
+  ADMIN: "/admin",
+  CASHIER: "/cashier",
+  CHEF: "/all-order",
+} as const;
+
 export default function CashierAuthCard() {
   const router = useRouter();
 
@@ -21,8 +27,11 @@ export default function CashierAuthCard() {
 
     const response = await loginService({ email: username, password });
 
-    if (response.status === "success") {
-      router.push("/cashier");
+    if (response.success || response.status === "success") {
+      const redirectPath = response.detectedRole
+        ? ROLE_REDIRECT_MAP[response.detectedRole]
+        : "/cashier";
+      router.push(redirectPath);
     } else {
       setErrorMessage(response.message ?? "Username หรือ Password ไม่ถูกต้อง");
     }

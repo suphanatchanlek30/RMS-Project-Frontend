@@ -1,6 +1,8 @@
 import { isAxiosError } from "axios";
 import axiosInstance from "./axiosInstance";
 
+export type AuthRole = "ADMIN" | "CASHIER" | "CHEF";
+
 export interface LoginPayload {
   email: string;
   password: string;
@@ -8,9 +10,20 @@ export interface LoginPayload {
 
 export interface LoginResponse {
   status: string;
+  success?: boolean;
   message?: string;
   token?: string;
   accessToken?: string;
+  detectedRole?: AuthRole;
+  data?: {
+    accessToken?: string;
+    roleName?: AuthRole;
+    employee?: {
+      role?: {
+        roleName?: AuthRole;
+      };
+    };
+  };
   [key: string]: unknown;
 }
 
@@ -28,6 +41,11 @@ const getLoginErrorMessage = (error: unknown): string => {
 };
 
 const getTokenFromResponse = (data: LoginResponse): string | undefined => {
+  const nestedToken = data.data?.accessToken;
+  if (typeof nestedToken === "string" && nestedToken.trim() !== "") {
+    return nestedToken;
+  }
+
   if (typeof data.token === "string" && data.token.trim() !== "") {
     return data.token;
   }
@@ -39,20 +57,41 @@ const getTokenFromResponse = (data: LoginResponse): string | undefined => {
   return undefined;
 };
 
+const getRoleFromResponse = (data: LoginResponse): AuthRole | undefined => {
+  const roleName = data.data?.roleName ?? data.data?.employee?.role?.roleName;
+  if (roleName === "ADMIN" || roleName === "CASHIER" || roleName === "CHEF") {
+    return roleName;
+  }
+
+  return undefined;
+};
+
 export const loginService = async (values: LoginPayload): Promise<LoginResponse> => {
   try {
-    const response = await axiosInstance.post<LoginResponse>("/auth/login", values);
+    const response = await axiosInstance.post<LoginResponse>("/api/v1/auth/login", values);
     const data = response.data;
+
+    const isSuccess = data.success === true || data.status === "success";
+    const detectedRole = getRoleFromResponse(data);
 
     const token = getTokenFromResponse(data);
     if (token && typeof window !== "undefined") {
       localStorage.setItem(TOKEN_KEY, token);
+      if (detectedRole) {
+        localStorage.setItem("activeRole", detectedRole);
+      }
     }
 
-    return data;
+    return {
+      ...data,
+      status: isSuccess ? "success" : data.status ?? "fail",
+      success: isSuccess,
+      detectedRole,
+    };
   } catch (error) {
     return {
       status: "fail",
+      success: false,
       message: getLoginErrorMessage(error),
     };
   }

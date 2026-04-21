@@ -24,12 +24,12 @@ export default function CashierHeader() {
         {/* content */}
         <div className="relative z-10 flex justify-between w-full items-center">
 
-          <div className="bg-[var(--bg)] text-black px-6 py-2 rounded-lg shadow-md">
+          <div className="bg-(--bg) text-black px-6 py-2 rounded-lg shadow-md">
             {CASHIER_NAME}
           </div>
 
           <button
-            onClick={() => router.push("/cashier/auth")}
+            onClick={() => router.push("/auth")}
             className="text-white hover:scale-110 transition"
           >
             <LogOut size={36} strokeWidth={2} />
