@@ -1,5 +1,7 @@
 // components/chef-section/auth-chef/auth-chef.types.ts
 
+import type { ChangeEvent } from "react";
+
 export interface ChefAuthLoginContent {
   title: string;
   usernameLabel: string;
@@ -30,5 +32,8 @@ export interface ChefAuthInputFieldProps {
   autoComplete: string;
   label: string;
   placeholder: string;
+  value?: string;
+  disabled?: boolean;
+  onChange?: (event: ChangeEvent<HTMLInputElement>) => void;
   className?: string;
 }
