@@ -1,143 +1,208 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from 'react';
-import { Search, LogOut, ChevronDown } from 'lucide-react';
-import OrderCard, { OrderItemProps } from './OrderCard';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { RefreshCw, LogOut } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import OrderCard from './OrderCard';
+import type { OrderItemProps } from './OrderCard';
 import { authSession } from '@/services/authSession';
 import { chefService } from '@/services/chef.service';
+
+const POLL_INTERVAL_MS = 15_000;
 
 interface TabButtonProps {
   active: boolean;
   onClick: () => void;
   label: string;
   count: number;
-  countColor?: string;
   activeColor?: string;
+  dotColor?: string;
 }
 
-const TabButton = ({ active, onClick, label, count, countColor = "bg-gray-200 text-gray-800", activeColor = "bg-red-600 text-white" }: TabButtonProps) => {
-  return (
-    <button
-      onClick={onClick}
-      className={`flex items-center gap-2 px-5 py-2 rounded-full border transition-all shadow-sm
-        ${active ? `${activeColor} border-transparent` : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'}`}
-    >
-      <span className="font-semibold text-sm">{label}</span>
-      {count > 0 && (
-        <span className={`flex items-center justify-center min-w-5 h-5 rounded-full text-xs font-bold px-1.5
-          ${active && activeColor.includes('red') ? 'bg-white text-red-600' : countColor + (countColor.includes('yellow') ? ' text-gray-800' : ' text-white')}`}>
-          {count}
-        </span>
-      )}
-    </button>
-  );
-};
+const TabButton = ({
+  active,
+  onClick,
+  label,
+  count,
+  activeColor = 'bg-[#e41616] text-white',
+  dotColor = 'bg-gray-400',
+}: TabButtonProps) => (
+  <button
+    onClick={onClick}
+    className={`flex items-center gap-2 px-5 py-2 rounded-full border transition-all shadow-sm
+      ${active ? `${activeColor} border-transparent` : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'}`}
+  >
+    <span className="font-semibold text-sm">{label}</span>
+    {count > 0 && (
+      <span
+        className={`flex items-center justify-center min-w-5 h-5 rounded-full text-xs font-bold px-1.5
+          ${active ? 'bg-white text-[#e41616]' : `${dotColor} text-white`}`}
+      >
+        {count}
+      </span>
+    )}
+  </button>
+);
 
+type Tab = 'All Order' | 'New Order' | 'Preparing' | 'Completed';
 
 export default function AllOrder() {
-  const [activeTab, setActiveTab] = useState('All Order');
+  const router = useRouter();
+  const [activeTab, setActiveTab] = useState<Tab>('All Order');
   const [orders, setOrders] = useState<OrderItemProps[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  useEffect(() => {
-    const loadOrders = async () => {
-      setIsLoading(true);
-      setErrorMessage(null);
+  const employeeName = useMemo(
+    () => authSession.getEmployeeProfile()?.employeeName ?? 'Chef',
+    []
+  );
 
-      const response = await chefService.getKitchenOrders();
-      if (!response.success || !response.data) {
-        setErrorMessage(response.message);
-        setOrders([]);
-        setIsLoading(false);
-        return;
-      }
+  const loadOrders = useCallback(async (silent = false) => {
+    if (!silent) setIsLoading(true);
+    else setIsRefreshing(true);
+    setErrorMessage(null);
 
-      setOrders(response.data);
-      setIsLoading(false);
-    };
+    const response = await chefService.getKitchenOrders();
 
-    void loadOrders();
+    if (!response.success || !response.data) {
+      setErrorMessage(response.message);
+    } else {
+      setOrders(
+        response.data.map((o) => ({
+          id: o.id,
+          tableNumber: o.tableNumber,
+          orderTime: o.orderTime,
+          status: o.status,
+          items: o.items.map((i) => ({ name: i.name, qty: i.qty })),
+        }))
+      );
+    }
+
+    if (!silent) setIsLoading(false);
+    else setIsRefreshing(false);
   }, []);
 
-  const employeeName = useMemo(() => authSession.getEmployeeProfile()?.employeeName ?? 'Chef', []);
+  useEffect(() => {
+    void loadOrders();
+  }, [loadOrders]);
 
-  const newOrdersCount = orders.filter(o => o.status === 'new').length;
-  const preparingCount = orders.filter(o => o.status === 'preparing').length;
-  const completedCount = orders.filter(o => o.status === 'completed').length;
-  const historyCount = 0; // Replace when history items are available
-  const allCount = orders.length;
+  useEffect(() => {
+    pollRef.current = setInterval(() => {
+      void loadOrders(true);
+    }, POLL_INTERVAL_MS);
+    return () => {
+      if (pollRef.current) clearInterval(pollRef.current);
+    };
+  }, [loadOrders]);
 
-  const filteredOrders = orders.filter(order => {
+  const handleLogout = () => {
+    authSession.clearClientAuthState();
+    router.push('/auth');
+  };
+
+  const newCount = orders.filter((o) => o.status === 'new').length;
+  const preparingCount = orders.filter((o) => o.status === 'preparing').length;
+  const completedCount = orders.filter((o) => o.status === 'completed').length;
+
+  const filteredOrders = orders.filter((order) => {
     if (activeTab === 'All Order') return true;
     if (activeTab === 'New Order') return order.status === 'new';
     if (activeTab === 'Preparing') return order.status === 'preparing';
     if (activeTab === 'Completed') return order.status === 'completed';
-    if (activeTab === 'History') return false; 
     return true;
   });
 
   return (
     <div className="min-h-screen bg-white font-sans flex flex-col">
       <div className="flex flex-col w-full flex-1">
-        {/* Header Section */}
         <div className="bg-[#5d1616] relative border-b-8 border-[#212121]">
-          {/* Subtle noise/texture overlay */}
-          <div className="absolute inset-0 opacity-10 pointer-events-none" style={{ backgroundImage: 'radial-gradient(#000 1px, transparent 1px)', backgroundSize: '4px 4px' }}></div>
-          
+          <div
+            className="absolute inset-0 opacity-10 pointer-events-none"
+            style={{ backgroundImage: 'radial-gradient(#000 1px, transparent 1px)', backgroundSize: '4px 4px' }}
+          />
           <div className="flex items-center justify-between px-6 py-5 relative z-10">
             <div className="bg-white rounded-md px-8 py-2.5 shadow-sm">
-              <span suppressHydrationWarning className="font-bold text-gray-800">{employeeName}</span>
+              <span suppressHydrationWarning className="font-bold text-gray-800">
+                {employeeName}
+              </span>
             </div>
-            
-            <div className="flex items-center gap-6 text-white mr-2">
-              <button className="hover:text-gray-300 transition-colors">
-                <Search size={28} strokeWidth={2.5} />
+            <div className="flex items-center gap-5 text-white">
+              <button
+                onClick={() => void loadOrders(true)}
+                disabled={isRefreshing}
+                className="hover:text-gray-300 transition-colors disabled:opacity-50"
+                title="รีเฟรช"
+              >
+                <RefreshCw size={24} strokeWidth={2.5} className={isRefreshing ? 'animate-spin' : ''} />
               </button>
-              <button className="hover:text-gray-300 transition-colors">
-                <LogOut size={28} strokeWidth={2.5} />
+              <button
+                onClick={handleLogout}
+                className="hover:text-gray-300 transition-colors"
+                title="ออกจากระบบ"
+              >
+                <LogOut size={26} strokeWidth={2.5} />
               </button>
             </div>
           </div>
         </div>
 
-        {/* Main Content Area */}
         <div className="bg-white flex-1 p-6 md:p-8">
-          {/* Tabs Group */}
-          <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between mb-8 gap-4 overflow-x-auto pb-2 scrollbar-none">
+          <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between mb-8 gap-4 overflow-x-auto pb-2">
             <div className="flex items-center gap-3 whitespace-nowrap">
-              <TabButton active={activeTab === 'All Order'} onClick={() => setActiveTab('All Order')} label="All Order" count={allCount} activeColor="bg-[#e41616] text-white" />
-              <TabButton active={activeTab === 'New Order'} onClick={() => setActiveTab('New Order')} label="New Order" count={newOrdersCount} countColor="bg-[#e41616]" />
-              <TabButton active={activeTab === 'Preparing'} onClick={() => setActiveTab('Preparing')} label="Preparing" count={preparingCount} countColor="bg-yellow-300" />
-              <TabButton active={activeTab === 'Completed'} onClick={() => setActiveTab('Completed')} label="Completed" count={completedCount} countColor="bg-green-500" />
-              <TabButton active={activeTab === 'History'} onClick={() => setActiveTab('History')} label="History" count={historyCount} />
+              <TabButton
+                active={activeTab === 'All Order'}
+                onClick={() => setActiveTab('All Order')}
+                label="All Order"
+                count={orders.length}
+                activeColor="bg-[#e41616] text-white"
+              />
+              <TabButton
+                active={activeTab === 'New Order'}
+                onClick={() => setActiveTab('New Order')}
+                label="New Order"
+                count={newCount}
+                dotColor="bg-[#e41616]"
+              />
+              <TabButton
+                active={activeTab === 'Preparing'}
+                onClick={() => setActiveTab('Preparing')}
+                label="Preparing"
+                count={preparingCount}
+                dotColor="bg-yellow-400"
+              />
+              <TabButton
+                active={activeTab === 'Completed'}
+                onClick={() => setActiveTab('Completed')}
+                label="Completed"
+                count={completedCount}
+                dotColor="bg-green-500"
+              />
             </div>
-            
-            <div className="flex shrink-0 items-center bg-white border border-gray-200 rounded-full px-5 py-2 cursor-pointer shadow-sm hover:bg-gray-50 transition-colors">
-              <span className="text-sm font-semibold mr-2 text-gray-800">Lastest Order</span>
-              <ChevronDown size={18} className="text-gray-600" />
+
+            <div className="text-xs text-gray-400 flex-shrink-0">
+              {isRefreshing ? 'กำลังรีเฟรช...' : `อัปเดตทุก ${POLL_INTERVAL_MS / 1000} วิ`}
             </div>
           </div>
 
-          {/* Grid Layout Container */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8 bg-white">
-            {errorMessage ? (
-              <div className="col-span-full rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-                {errorMessage}
-              </div>
-            ) : null}
+          {errorMessage && (
+            <div className="mb-6 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              {errorMessage}
+            </div>
+          )}
 
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {isLoading ? (
-              Array.from({ length: 6 }, (_, index) => (
-                <div key={index} className="h-72 animate-pulse rounded-2xl bg-gray-100" />
+              Array.from({ length: 6 }, (_, i) => (
+                <div key={i} className="h-72 animate-pulse rounded-2xl bg-gray-100" />
               ))
             ) : filteredOrders.length > 0 ? (
-              filteredOrders.map((order) => (
-                <OrderCard key={order.id} {...order} />
-              ))
+              filteredOrders.map((order) => <OrderCard key={order.id} {...order} />)
             ) : (
-              <div className="col-span-full py-12 text-center text-gray-500 flex flex-col items-center justify-center">
-                <span className="text-lg font-medium">ไม่มีรายการอาหารในสถานะนี้</span>
+              <div className="col-span-full py-16 text-center text-gray-400">
+                <p className="text-lg font-medium">ไม่มีรายการในสถานะนี้</p>
               </div>
             )}
           </div>

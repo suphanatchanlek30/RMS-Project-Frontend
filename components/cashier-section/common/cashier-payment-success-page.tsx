@@ -82,7 +82,9 @@ export default function CashierPaymentSuccessPage({
           <div className="mt-6 rounded-2xl bg-white px-5 py-4 text-sm text-black shadow-sm">
             <div className="flex items-center justify-between gap-4">
               <span className="text-black/55">Receipt No.</span>
-              <span className="font-bold">{receiptDetail?.receiptNumber ?? checkoutRecord?.receiptNumber ?? "-"}</span>
+              <span className="font-bold">
+                {receiptDetail?.receiptNumber ?? checkoutRecord?.receiptNumber ?? "-"}
+              </span>
             </div>
             <div className="mt-3 flex items-center justify-between gap-4">
               <span className="text-black/55">Payment ID</span>
@@ -90,11 +92,21 @@ export default function CashierPaymentSuccessPage({
             </div>
             <div className="mt-3 flex items-center justify-between gap-4">
               <span className="text-black/55">Paid Amount</span>
-              <span className="font-bold">{paymentDetail ? `${paymentDetail.paidAmount.toFixed(2)} ฿` : "-"}</span>
+              <span className="font-bold">
+                {paymentDetail
+                  ? `${(paymentDetail.totalAmount ?? paymentDetail.paidAmount ?? 0).toFixed(2)} ฿`
+                  : "-"}
+              </span>
             </div>
             <div className="mt-3 flex items-center justify-between gap-4">
               <span className="text-black/55">Change</span>
-              <span className="font-bold">{paymentDetail ? `${paymentDetail.changeAmount.toFixed(2)} ฿` : checkoutRecord ? `${checkoutRecord.changeAmount.toFixed(2)} ฿` : "-"}</span>
+              <span className="font-bold">
+                {paymentDetail
+                  ? `${(paymentDetail.changeAmount ?? 0).toFixed(2)} ฿`
+                  : checkoutRecord
+                  ? `${checkoutRecord.changeAmount.toFixed(2)} ฿`
+                  : "-"}
+              </span>
             </div>
             <div className="mt-3 flex items-center justify-between gap-4">
               <span className="text-black/55">Receipt Total</span>

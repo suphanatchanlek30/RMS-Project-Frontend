@@ -43,7 +43,7 @@ export const itemService = {
           description: category.description,
         };
       })
-      .filter((value): value is Category => value !== null);
+      .filter((value) => value !== null) as Category[];
 
     const categoryByName = new Map(baseCategories.map((category) => [category.label.toLowerCase(), category.id]));
 
@@ -87,7 +87,7 @@ export const itemService = {
           description: item.description,
         };
       })
-      .filter((value): value is MenuItem => value !== null);
+      .filter((value) => value !== null) as MenuItem[];
 
     const missingCategoryIds = [...new Set(items.map((item) => item.categoryId))].filter(
       (id) => id !== "all" && !baseCategories.some((category) => category.id === id)

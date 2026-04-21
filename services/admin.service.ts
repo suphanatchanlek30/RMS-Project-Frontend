@@ -174,17 +174,25 @@ export interface SalesReportItem {
 export interface TopMenuReportItem {
   menuId: number;
   menuName: string;
-  totalSold: number;
-  totalRevenue?: number;
+  totalQuantity: number;
+  totalAmount: number;
+  /** Alias for backward compat */
+  totalSold?: number;
 }
+
+export type ReportGroupBy = "day" | "month";
 
 export interface PaymentItem {
   paymentId: number;
   sessionId: number;
   paymentMethodName?: string;
-  paidAmount: number;
-  changeAmount: number;
+  /** Total amount charged (API field: totalAmount) */
+  totalAmount: number;
+  paymentStatus?: string;
+  paymentTime?: string;
   createdAt?: string;
+  /** Alias kept for backward compat */
+  paidAmount?: number;
 }
 
 export interface ReceiptItem {
@@ -504,10 +512,23 @@ export const adminService = {
     }
   },
 
-  async getMenus(): Promise<AdminListResponse<MenuItem>> {
+  async getMenus(params?: {
+    categoryId?: number;
+    keyword?: string;
+    status?: boolean;
+    page?: number;
+    limit?: number;
+  }): Promise<AdminListResponse<MenuItem>> {
     try {
       const response = await axiosInstance.get<AdminListResponse<MenuItem>>(`${API_PREFIX}/menus`, {
         headers: getAdminHeaders(),
+        params: {
+          categoryId: params?.categoryId,
+          keyword: params?.keyword,
+          status: params?.status,
+          page: params?.page ?? 1,
+          limit: params?.limit ?? 50,
+        },
       });
       return {
         ...response.data,
@@ -550,12 +571,23 @@ export const adminService = {
     }
   },
 
-  async getSalesReport(params?: { startDate?: string; endDate?: string }): Promise<AdminListResponse<SalesReportItem>> {
+  async getSalesReport(params?: {
+    dateFrom?: string;
+    dateTo?: string;
+    groupBy?: ReportGroupBy;
+  }): Promise<AdminListResponse<SalesReportItem>> {
     try {
-      const response = await axiosInstance.get<AdminListResponse<SalesReportItem>>(`${API_PREFIX}/reports/sales`, {
-        headers: getAdminHeaders(),
-        params,
-      });
+      const response = await axiosInstance.get<AdminListResponse<SalesReportItem>>(
+        `${API_PREFIX}/reports/sales`,
+        {
+          headers: getAdminHeaders(),
+          params: {
+            dateFrom: params?.dateFrom,
+            dateTo: params?.dateTo,
+            groupBy: params?.groupBy ?? "day",
+          },
+        }
+      );
       return {
         ...response.data,
         data: toList<SalesReportItem>(response.data.data),
@@ -569,21 +601,50 @@ export const adminService = {
     }
   },
 
-  async getTopMenusReport(params?: { limit?: number }): Promise<AdminListResponse<TopMenuReportItem>> {
+  async getTopMenusReport(params?: {
+    dateFrom?: string;
+    dateTo?: string;
+    limit?: number;
+  }): Promise<AdminListResponse<TopMenuReportItem>> {
     try {
-      const response = await axiosInstance.get<AdminListResponse<TopMenuReportItem>>(`${API_PREFIX}/reports/top-menus`, {
-        headers: getAdminHeaders(),
-        params,
-      });
-      return {
-        ...response.data,
-        data: toList<TopMenuReportItem>(response.data.data),
-      };
+      const response = await axiosInstance.get<AdminListResponse<TopMenuReportItem>>(
+        `${API_PREFIX}/reports/top-menus`,
+        {
+          headers: getAdminHeaders(),
+          params: {
+            dateFrom: params?.dateFrom,
+            dateTo: params?.dateTo,
+            limit: params?.limit ?? 10,
+          },
+        }
+      );
+      // Normalize: add totalSold alias from totalQuantity
+      const items = toList<TopMenuReportItem>(response.data.data).map((item) => ({
+        ...item,
+        totalSold: item.totalQuantity ?? item.totalSold ?? 0,
+      }));
+      return { ...response.data, data: items };
     } catch (error) {
       return {
         success: false,
         message: getErrorMessage(error, "ดึงรายงานเมนูขายดีไม่สำเร็จ"),
         data: [],
+      };
+    }
+  },
+
+  async updateMenuStatus(menuId: number, menuStatus: boolean): Promise<AdminDetailResponse<{ menuId: number; menuStatus: boolean }>> {
+    try {
+      const response = await axiosInstance.patch<AdminDetailResponse<{ menuId: number; menuStatus: boolean }>>(
+        `${API_PREFIX}/menus/${menuId}/status`,
+        { menuStatus },
+        { headers: getAdminHeaders() }
+      );
+      return response.data;
+    } catch (error) {
+      return {
+        success: false,
+        message: getErrorMessage(error, "อัปเดตสถานะเมนูไม่สำเร็จ"),
       };
     }
   },
@@ -621,6 +682,20 @@ export const adminService = {
     }
   },
 
+  async getReceiptById(receiptId: number): Promise<AdminDetailResponse<ReceiptItem>> {
+    try {
+      const response = await axiosInstance.get<AdminDetailResponse<ReceiptItem>>(`${API_PREFIX}/receipts/${receiptId}`, {
+        headers: getAdminHeaders(),
+      });
+      return response.data;
+    } catch (error) {
+      return {
+        success: false,
+        message: getErrorMessage(error, "ดึงรายละเอียดใบเสร็จไม่สำเร็จ"),
+      };
+    }
+  },
+
   async getReceipts(params?: { page?: number; limit?: number }): Promise<AdminListResponse<ReceiptItem>> {
     try {
       const response = await axiosInstance.get<AdminListResponse<ReceiptItem>>(`${API_PREFIX}/receipts`, {
@@ -636,20 +711,6 @@ export const adminService = {
         success: false,
         message: getErrorMessage(error, "ดึงรายการใบเสร็จไม่สำเร็จ"),
         data: [],
-      };
-    }
-  },
-
-  async getReceiptById(receiptId: number): Promise<AdminDetailResponse<ReceiptItem>> {
-    try {
-      const response = await axiosInstance.get<AdminDetailResponse<ReceiptItem>>(`${API_PREFIX}/receipts/${receiptId}`, {
-        headers: getAdminHeaders(),
-      });
-      return response.data;
-    } catch (error) {
-      return {
-        success: false,
-        message: getErrorMessage(error, "ดึงรายละเอียดใบเสร็จไม่สำเร็จ"),
       };
     }
   },

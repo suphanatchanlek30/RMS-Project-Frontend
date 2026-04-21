@@ -1,290 +1,396 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from 'react';
-import { LogOut, ChevronDown, Check } from 'lucide-react';
+import { ArrowLeft, Check, Clock, ChefHat, CheckCircle2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { authSession } from '@/services/authSession';
-import { chefService, type ChefOrderDetail } from '@/services/chef.service';
+import {
+  chefService,
+  type ChefOrderDetail,
+  type ChefItemStatus,
+  type ChefItemStatusUpdate,
+} from '@/services/chef.service';
+
+// ─── Status helpers ───────────────────────────────────────────────────────────
+
+const STATUS_LABEL: Record<ChefItemStatus, string> = {
+  WAITING: 'รอทำ',
+  PREPARING: 'กำลังทำ',
+  COMPLETED: 'เสร็จแล้ว',
+  CANCELLED: 'ยกเลิก',
+};
+
+const STATUS_COLOR: Record<ChefItemStatus, string> = {
+  WAITING: 'bg-red-100 text-red-700 border-red-200',
+  PREPARING: 'bg-yellow-100 text-yellow-700 border-yellow-200',
+  COMPLETED: 'bg-green-100 text-green-700 border-green-200',
+  CANCELLED: 'bg-gray-100 text-gray-400 border-gray-200',
+};
+
+const STATUS_DOT: Record<ChefItemStatus, string> = {
+  WAITING: 'bg-red-500',
+  PREPARING: 'bg-yellow-400',
+  COMPLETED: 'bg-green-500',
+  CANCELLED: 'bg-gray-300',
+};
+
+const ACTION_LABEL: Record<ChefItemStatusUpdate, string> = {
+  PREPARING: 'เริ่มทำ',
+  COMPLETED: 'ทำเสร็จ',
+};
+
+const ACTION_COLOR: Record<ChefItemStatusUpdate, string> = {
+  PREPARING: 'bg-yellow-400 hover:bg-yellow-500 text-gray-900',
+  COMPLETED: 'bg-green-500 hover:bg-green-600 text-white',
+};
+
+// ─── Spark decoration ─────────────────────────────────────────────────────────
 
 const Spark = ({ className }: { className?: string }) => (
   <svg viewBox="0 0 24 24" className={className} fill="currentColor">
-    <path d="M12 0 C12 8 16 12 24 12 C16 12 12 16 12 24 C12 16 8 12 0 12 C8 12 12 8 12 0 Z"/>
+    <path d="M12 0 C12 8 16 12 24 12 C16 12 12 16 12 24 C12 16 8 12 0 12 C8 12 12 8 12 0 Z" />
   </svg>
 );
 
-interface TabButtonProps {
-  active: boolean;
-  onClick: () => void;
-  label: string;
-  count: number;
-  countColor?: string;
-  activeColor?: string;
-}
-
-const TabButton = ({ active, onClick, label, count, countColor = "bg-gray-200 text-gray-800", activeColor = "bg-[#d20000] text-white" }: TabButtonProps) => {
-  return (
-    <button
-      onClick={onClick}
-      className={`flex items-center gap-2 px-5 py-2 rounded-full border transition-all shadow-sm
-        ${active ? `${activeColor} border-transparent` : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'}`}
-    >
-      <span className="font-semibold text-sm">{label}</span>
-      {count !== undefined && count > 0 && (
-        <span className={`flex items-center justify-center min-w-5 h-5 rounded-full text-xs font-bold px-1.5
-          ${active && activeColor.includes('red') ? 'bg-white text-red-600' : countColor + (countColor.includes('yellow') ? ' text-gray-800' : ' text-white')}`}>
-          {count}
-        </span>
-      )}
-    </button>
-  );
-};
+// ─── Component ────────────────────────────────────────────────────────────────
 
 export default function DetailOrder({ orderId }: { orderId: string }) {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState('All Order');
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [orderDetail, setOrderDetail] = useState<ChefOrderDetail | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [updatingItems, setUpdatingItems] = useState<Set<number>>(new Set());
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
-    const loadOrderDetail = async () => {
+    const load = async () => {
       setIsLoading(true);
       setErrorMessage(null);
-
       const response = await chefService.getKitchenOrderById(orderId);
       if (!response.success || !response.data) {
         setErrorMessage(response.message);
-        setOrderDetail(null);
-        setIsLoading(false);
-        return;
+      } else {
+        setOrderDetail(response.data);
       }
-
-      setOrderDetail(response.data);
       setIsLoading(false);
     };
-
-    void loadOrderDetail();
+    void load();
   }, [orderId]);
 
-  const employeeName = useMemo(() => authSession.getEmployeeProfile()?.employeeName ?? 'Chef', []);
+  const employeeName = useMemo(
+    () => authSession.getEmployeeProfile()?.employeeName ?? 'Chef',
+    []
+  );
 
-  const allCount = orderDetail ? 1 : 0;
-  const newOrdersCount = orderDetail?.status === 'new' ? 1 : 0;
-  const preparingCount = orderDetail?.status === 'preparing' ? 1 : 0;
-  const completedCount = orderDetail?.status === 'completed' ? 1 : 0;
-  const historyCount = 0;
+  const waitingItems = orderDetail?.items.filter((i) => i.itemStatus === 'WAITING') ?? [];
+  const preparingItems = orderDetail?.items.filter((i) => i.itemStatus === 'PREPARING') ?? [];
+  const completedItems = orderDetail?.items.filter((i) => i.itemStatus === 'COMPLETED') ?? [];
+  const cancelledItems = orderDetail?.items.filter((i) => i.itemStatus === 'CANCELLED') ?? [];
 
-  const pendingItems = orderDetail?.items.filter((item) => item.itemStatus !== 'completed') ?? [];
-  const completedItems = orderDetail?.items.filter((item) => item.itemStatus === 'completed') ?? [];
+  const activeItems = [...waitingItems, ...preparingItems];
+  const allDone = activeItems.length === 0 && (completedItems.length > 0 || cancelledItems.length > 0);
 
-  const markItemReady = async (itemId: number) => {
+  /**
+   * Advance a single item to its next status.
+   * WAITING → PREPARING, PREPARING → COMPLETED
+   */
+  const handleAdvanceItem = async (orderItemId: number, current: ChefItemStatus) => {
+    const nextStatus = chefService.getNextStatus(current);
+    if (!nextStatus) return;
+
+    setUpdatingItems((prev) => new Set(prev).add(orderItemId));
     setErrorMessage(null);
 
-    const response = await chefService.updateOrderItemStatus(itemId, 'READY');
+    const response = await chefService.updateOrderItemStatus(orderItemId, nextStatus);
+
     if (!response.success) {
       setErrorMessage(response.message);
-      return;
+    } else {
+      setOrderDetail((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          items: prev.items.map((item) =>
+            item.orderItemId === orderItemId
+              ? { ...item, itemStatus: nextStatus as ChefItemStatus }
+              : item
+          ),
+        };
+      });
     }
 
-    setOrderDetail((current) => {
-      if (!current) return current;
-      return {
-        ...current,
-        items: current.items.map((item) =>
-          item.orderItemId === itemId ? { ...item, itemStatus: 'completed' } : item
-        ),
-      };
+    setUpdatingItems((prev) => {
+      const next = new Set(prev);
+      next.delete(orderItemId);
+      return next;
     });
   };
 
-  const handleSubmitOrder = async () => {
-    if (!pendingItems.length) {
+  /**
+   * Mark ALL remaining active items as COMPLETED.
+   * Respects the state machine: items go WAITING→PREPARING first if needed,
+   * but we batch PREPARING→COMPLETED for items already in PREPARING.
+   * WAITING items require 2 steps, so we first push them to PREPARING then COMPLETED.
+   */
+  const handleCompleteAll = async () => {
+    const itemsToAdvance = activeItems.filter(
+      (i) => i.itemStatus === 'WAITING' || i.itemStatus === 'PREPARING'
+    );
+    if (!itemsToAdvance.length) {
       setIsSubmitted(true);
       return;
     }
 
-    setIsSubmitting(true);
     setErrorMessage(null);
 
-    const results = await Promise.all(
-      pendingItems.map((item) => chefService.updateOrderItemStatus(item.orderItemId, 'READY'))
-    );
-
-    const failedResult = results.find((result) => !result.success);
-    if (failedResult) {
-      setErrorMessage(failedResult.message);
-      setIsSubmitting(false);
-      return;
+    // Step 1: move all WAITING → PREPARING
+    const waitingToAdvance = itemsToAdvance.filter((i) => i.itemStatus === 'WAITING');
+    if (waitingToAdvance.length) {
+      const results = await Promise.all(
+        waitingToAdvance.map((i) => chefService.updateOrderItemStatus(i.orderItemId, 'PREPARING'))
+      );
+      const fail = results.find((r) => !r.success);
+      if (fail) { setErrorMessage(fail.message); return; }
+      setOrderDetail((prev) => {
+        if (!prev) return prev;
+        const ids = new Set(waitingToAdvance.map((i) => i.orderItemId));
+        return {
+          ...prev,
+          items: prev.items.map((item) =>
+            ids.has(item.orderItemId) ? { ...item, itemStatus: 'PREPARING' as ChefItemStatus } : item
+          ),
+        };
+      });
     }
 
-    setOrderDetail((current) => {
-      if (!current) return current;
+    // Step 2: move all PREPARING → COMPLETED
+    const allPreparing = itemsToAdvance.map((i) => i.orderItemId);
+    const results2 = await Promise.all(
+      allPreparing.map((id) => chefService.updateOrderItemStatus(id, 'COMPLETED'))
+    );
+    const fail2 = results2.find((r) => !r.success);
+    if (fail2) { setErrorMessage(fail2.message); return; }
+
+    setOrderDetail((prev) => {
+      if (!prev) return prev;
+      const ids = new Set(allPreparing);
       return {
-        ...current,
+        ...prev,
         status: 'completed',
-        items: current.items.map((item) => ({ ...item, itemStatus: 'completed' })),
+        items: prev.items.map((item) =>
+          ids.has(item.orderItemId) ? { ...item, itemStatus: 'COMPLETED' as ChefItemStatus } : item
+        ),
       };
     });
-    setIsSubmitting(false);
     setIsSubmitted(true);
   };
 
-  return (
-    <div className="min-h-screen bg-white font-sans flex flex-col">
-      <div className="flex flex-col w-full flex-1">
-        {/* Header Section */}
+  // ─── Success screen ────────────────────────────────────────────────────────
+
+  if (isSubmitted || allDone) {
+    return (
+      <div className="min-h-screen bg-white font-sans flex flex-col">
         <div className="bg-[#5d1616] relative border-b-8 border-[#212121]">
-          {/* Subtle noise/texture overlay */}
-          <div className="absolute inset-0 opacity-10 pointer-events-none" style={{ backgroundImage: 'radial-gradient(#000 1px, transparent 1px)', backgroundSize: '4px 4px' }}></div>
-          
+          <div className="absolute inset-0 opacity-10 pointer-events-none"
+            style={{ backgroundImage: 'radial-gradient(#000 1px, transparent 1px)', backgroundSize: '4px 4px' }} />
           <div className="flex items-center justify-between px-6 py-5 relative z-10">
             <div className="bg-white rounded-md px-8 py-2.5 shadow-sm">
               <span suppressHydrationWarning className="font-bold text-gray-800">{employeeName}</span>
             </div>
-            
-            <div className="flex items-center gap-6 text-white mr-2">
-              <button onClick={() => router.push('/all-order')} className="hover:text-gray-300 transition-colors">
-                <LogOut size={28} strokeWidth={2.5} />
-              </button>
-            </div>
+            <button onClick={() => router.push('/all-order')} className="text-white hover:text-gray-300">
+              <ArrowLeft size={28} strokeWidth={2.5} />
+            </button>
           </div>
         </div>
 
-        {/* Main Content Area */}
-        <div className="bg-white flex-1 p-6 md:p-8 flex flex-col items-center">
-          {/* Tabs Group */}
-          <div className="flex flex-col lg:flex-row w-full items-start lg:items-center justify-between mb-10 gap-4 overflow-x-auto pb-2 scrollbar-none">
-            <div className="flex items-center gap-3 whitespace-nowrap">
-              <TabButton active={activeTab === 'All Order'} onClick={() => setActiveTab('All Order')} label="All Order" count={allCount} activeColor="bg-[#d20000] text-white" />
-              <TabButton active={activeTab === 'New Order'} onClick={() => setActiveTab('New Order')} label="New Order" count={newOrdersCount} countColor="bg-[#d20000]" />
-              <TabButton active={activeTab === 'Preparing'} onClick={() => setActiveTab('Preparing')} label="Preparing" count={preparingCount} countColor="bg-yellow-300" />
-              <TabButton active={activeTab === 'Completed'} onClick={() => setActiveTab('Completed')} label="Completed" count={completedCount} countColor="bg-green-500" />
-              <TabButton active={activeTab === 'History'} onClick={() => setActiveTab('History')} label="History" count={historyCount} />
+        <div className="flex-1 flex items-center justify-center p-6">
+          <div className="bg-[#f2f2f2] rounded-3xl p-8 w-full max-w-[420px] shadow-sm border border-gray-200 flex flex-col items-center min-h-[400px] justify-center relative overflow-hidden">
+            <div className="relative flex items-center justify-center w-full h-36 mb-4">
+              <Spark className="absolute text-[#e04040] w-6 h-6 top-8 left-[20%] opacity-80" />
+              <Spark className="absolute text-[#e04040] w-3 h-3 top-1 left-[30%] opacity-50" />
+              <Spark className="absolute text-[#cc0000] w-4 h-4 top-10 right-[35%]" />
+              <Spark className="absolute text-[#e04040] w-3 h-3 bottom-4 right-[15%] opacity-60" />
+              <div className="w-24 h-24 bg-[#d20000] rounded-full flex items-center justify-center shadow-lg z-10">
+                <Check size={48} strokeWidth={3.5} className="text-white" />
+              </div>
             </div>
-            
-            <div className="flex shrink-0 items-center bg-[#f8f9fa] border border-gray-200 rounded-full px-5 py-2 cursor-pointer shadow-sm hover:bg-gray-50 transition-colors">
-              <span className="text-[13px] font-semibold mr-2 text-gray-800">Lastest Order</span>
-              <ChevronDown size={18} className="text-gray-600" />
-            </div>
+            <h3 className="text-base font-semibold text-gray-800 mb-8">Order Completed</h3>
+            <button
+              onClick={() => router.push('/all-order')}
+              className="bg-[#d20000] hover:bg-red-700 text-white font-bold py-3 px-10 rounded-lg text-sm w-[80%] shadow-md"
+            >
+              OK
+            </button>
           </div>
+        </div>
+      </div>
+    );
+  }
 
-          {/* Centered Detail Card */}
-          <div className="flex justify-center w-full flex-1 mb-8">
-            {isSubmitted ? (
-              <div className="bg-[#f2f2f2] rounded-3xl p-8 w-full max-w-[450px] shadow-sm flex flex-col border border-gray-200 justify-center items-center relative overflow-hidden min-h-[450px]">
-                {/* Success Animation Area */}
-                <div className="flex-1 flex flex-col items-center justify-center w-full relative">
-                  <div className="relative w-full h-40 flex items-center justify-center -mt-8">
-                     {/* Sparks - Absolute positioning across the container */}
-                     <Spark className="absolute text-[#e04040] w-6 h-6 top-8 left-[20%] opacity-80" />
-                     <Spark className="absolute text-[#e04040] w-3 h-3 top-1 left-[30%] opacity-50" />
-                     <Spark className="absolute text-[#cc0000] w-4 h-4 top-10 right-[35%]" />
-                     <Spark className="absolute text-[#e04040] w-3 h-3 top-20 left-[15%] opacity-90" />
-                     <Spark className="absolute text-[#cc0000] w-4 h-4 bottom-8 right-[25%]" />
-                     <Spark className="absolute text-[#e04040] w-7 h-7 bottom-4 right-[15%] opacity-60" />
-                     <div className="absolute w-1.25 h-1.25 rounded-full bg-[#f08080] top-[30%] right-[40%]" />
-                     <div className="absolute w-1 h-1 rounded-full bg-[#e04040] bottom-[20%] left-[20%]" />
+  // ─── Main detail view ──────────────────────────────────────────────────────
 
-                     {/* Main Circle */}
-                     <div className="w-24 h-24 bg-[#d20000] rounded-full flex items-center justify-center shadow-lg relative z-10 transition-transform duration-500 scale-100">
-                       <Check size={48} strokeWidth={3.5} className="text-white" />
-                     </div>
-                  </div>
-                  <h3 className="text-[15px] font-medium text-gray-800 mt-8 mb-6 text-center">Order Completed</h3>
-                </div>
+  return (
+    <div className="min-h-screen bg-white font-sans flex flex-col">
+      {/* Header */}
+      <div className="bg-[#5d1616] relative border-b-8 border-[#212121]">
+        <div className="absolute inset-0 opacity-10 pointer-events-none"
+          style={{ backgroundImage: 'radial-gradient(#000 1px, transparent 1px)', backgroundSize: '4px 4px' }} />
+        <div className="flex items-center justify-between px-6 py-5 relative z-10">
+          <div className="bg-white rounded-md px-8 py-2.5 shadow-sm">
+            <span suppressHydrationWarning className="font-bold text-gray-800">{employeeName}</span>
+          </div>
+          <button onClick={() => router.push('/all-order')} className="text-white hover:text-gray-300">
+            <ArrowLeft size={28} strokeWidth={2.5} />
+          </button>
+        </div>
+      </div>
 
-                <div className="w-full flex justify-center pb-2">
-                  <button onClick={() => router.push('/all-order')} className="bg-[#d20000] hover:bg-red-700 text-white font-bold py-3.5 px-8 rounded-lg transition-colors text-[14px] w-[80%] shadow-md">
-                    OK
-                  </button>
-                </div>
-              </div>
-            ) : (
-            <div className="bg-[#f2f2f2] rounded-3xl p-8 w-full max-w-[450px] shadow-sm flex flex-col border border-gray-200">
-              {/* Order ID Tag */}
-              <div className="mb-6 flex">
-                <div className="bg-white px-5 py-2 rounded-lg font-bold text-[14px] shadow-sm text-gray-800">
-                  {orderDetail?.tableLabel ?? orderId.toUpperCase()}
-                </div>
-              </div>
-
-              {errorMessage ? (
-                <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-                  {errorMessage}
-                </div>
-              ) : null}
-
-              {isLoading ? (
-                <div className="space-y-3">
-                  {Array.from({ length: 3 }, (_, index) => (
-                    <div key={index} className="h-16 animate-pulse rounded-xl bg-white/80" />
-                  ))}
-                </div>
-              ) : (
-                <>
-
-              {/* Pending Items */}
-              {pendingItems.length > 0 && (
-                <div className="mb-6">
-                  <h3 className="font-bold text-[13px] text-gray-800 mb-4 ml-1">รายการที่ยังไม่ได้ทำ</h3>
-                  <div className="space-y-3">
-                    {pendingItems.map((item) => (
-                      <div key={item.orderItemId} className="flex items-center gap-4">
-                        <button onClick={() => void markItemReady(item.orderItemId)} className="shrink-0 flex items-center justify-center w-7">
-                          <div className={`w-5 h-5 rounded-full border-2 border-[#222] flex items-center justify-center bg-transparent transition-colors`}>
-                          </div>
-                        </button>
-                        <div className="bg-white px-4 py-2.5 rounded-lg flex-1 flex justify-between gap-4 shadow-sm h-full items-center">
-                          <div className="flex flex-col flex-1">
-                            <span className="text-[11px] font-medium text-gray-800 leading-snug wrap-break-word">{item.menuName}</span>
-                            <span className="text-[10px] text-gray-500 mt-1">{item.note ? `• ${item.note}` : 'กำลังเตรียม'}</span>
-                          </div>
-                          <span className="text-[11px] font-bold text-gray-500">x{item.quantity}</span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Completed Items */}
-              {completedItems.length > 0 && (
-                <div className="mb-6">
-                  <h3 className="font-bold text-[13px] text-gray-800 mb-4 ml-1 mt-4">รายการที่เสร็จสิ้น</h3>
-                  <div className="space-y-3">
-                    {completedItems.map((item) => (
-                      <div key={item.orderItemId} className="flex items-center gap-4">
-                        <button className="shrink-0 flex items-center justify-center w-7">
-                          <div className={`w-5 h-5 rounded-full border-2 border-[#222] flex items-center justify-center bg-transparent transition-colors`}>
-                             <div className="w-2.5 h-2.5 rounded-full bg-[#222]" />
-                          </div>
-                        </button>
-                        <div className="bg-white px-4 py-2.5 rounded-lg flex-1 flex justify-between gap-4 shadow-sm h-full items-center opacity-90">
-                          <div className="flex flex-col flex-1">
-                            <span className="text-[11px] font-medium text-gray-800 leading-snug wrap-break-word">{item.menuName}</span>
-                            <span className="text-[10px] text-gray-500 mt-1">{item.note ? `• ${item.note}` : 'พร้อมเสิร์ฟ'}</span>
-                          </div>
-                          <span className="text-[11px] font-bold text-gray-500">x{item.quantity}</span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Send Order Button */}
-              <div className="mt-auto flex justify-center pt-8 pb-2">
-                <button onClick={() => void handleSubmitOrder()} disabled={isSubmitting || isLoading} className="bg-[#d20000] hover:bg-red-700 text-white font-bold py-2.5 px-8 rounded-lg transition-colors text-sm w-50 shadow-md disabled:cursor-not-allowed disabled:opacity-60">
-                  {isSubmitting ? 'Sending...' : 'Send Order'}
-                </button>
-              </div>
-                </>
-              )}
+      {/* Content */}
+      <div className="flex-1 p-6 flex flex-col items-center">
+        <div className="w-full max-w-[500px]">
+          {/* Order ID */}
+          <div className="mb-6 flex items-center justify-between">
+            <div className="bg-gray-100 px-5 py-2 rounded-lg font-bold text-sm shadow-sm text-gray-800">
+              Order #{orderId}
             </div>
+            {orderDetail?.tableLabel && (
+              <div className="text-sm font-semibold text-gray-500">{orderDetail.tableLabel}</div>
             )}
           </div>
+
+          {/* Error */}
+          {errorMessage && (
+            <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              {errorMessage}
+            </div>
+          )}
+
+          {/* Loading skeleton */}
+          {isLoading ? (
+            <div className="space-y-3">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="h-16 animate-pulse rounded-xl bg-gray-100" />
+              ))}
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {/* WAITING items */}
+              {waitingItems.length > 0 && (
+                <div>
+                  <div className="flex items-center gap-2 mb-3">
+                    <Clock size={14} className="text-red-500" />
+                    <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">รอทำ ({waitingItems.length})</span>
+                  </div>
+                  <div className="space-y-2">
+                    {waitingItems.map((item) => (
+                      <div key={item.orderItemId} className="flex items-center gap-3 bg-white rounded-xl p-3 shadow-sm border border-gray-100">
+                        <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${STATUS_DOT[item.itemStatus]}`} />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold text-gray-800 truncate">{item.menuName}</p>
+                          {item.note && <p className="text-xs text-gray-400 mt-0.5">• {item.note}</p>}
+                        </div>
+                        <span className="text-sm font-bold text-gray-500 mr-2">x{item.quantity}</span>
+                        <button
+                          onClick={() => void handleAdvanceItem(item.orderItemId, item.itemStatus)}
+                          disabled={updatingItems.has(item.orderItemId)}
+                          className={`text-xs font-bold px-3 py-1.5 rounded-lg transition-colors flex-shrink-0 disabled:opacity-50 ${ACTION_COLOR['PREPARING']}`}
+                        >
+                          {updatingItems.has(item.orderItemId) ? '...' : ACTION_LABEL['PREPARING']}
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* PREPARING items */}
+              {preparingItems.length > 0 && (
+                <div>
+                  <div className="flex items-center gap-2 mb-3">
+                    <ChefHat size={14} className="text-yellow-500" />
+                    <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">กำลังทำ ({preparingItems.length})</span>
+                  </div>
+                  <div className="space-y-2">
+                    {preparingItems.map((item) => (
+                      <div key={item.orderItemId} className="flex items-center gap-3 bg-white rounded-xl p-3 shadow-sm border border-yellow-100">
+                        <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${STATUS_DOT[item.itemStatus]}`} />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold text-gray-800 truncate">{item.menuName}</p>
+                          {item.note && <p className="text-xs text-gray-400 mt-0.5">• {item.note}</p>}
+                        </div>
+                        <span className="text-sm font-bold text-gray-500 mr-2">x{item.quantity}</span>
+                        <button
+                          onClick={() => void handleAdvanceItem(item.orderItemId, item.itemStatus)}
+                          disabled={updatingItems.has(item.orderItemId)}
+                          className={`text-xs font-bold px-3 py-1.5 rounded-lg transition-colors flex-shrink-0 disabled:opacity-50 ${ACTION_COLOR['COMPLETED']}`}
+                        >
+                          {updatingItems.has(item.orderItemId) ? '...' : ACTION_LABEL['COMPLETED']}
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* COMPLETED items */}
+              {completedItems.length > 0 && (
+                <div>
+                  <div className="flex items-center gap-2 mb-3">
+                    <CheckCircle2 size={14} className="text-green-500" />
+                    <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">เสร็จแล้ว ({completedItems.length})</span>
+                  </div>
+                  <div className="space-y-2">
+                    {completedItems.map((item) => (
+                      <div key={item.orderItemId} className="flex items-center gap-3 bg-white rounded-xl p-3 shadow-sm border border-green-100 opacity-60">
+                        <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${STATUS_DOT[item.itemStatus]}`} />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold text-gray-500 line-through truncate">{item.menuName}</p>
+                        </div>
+                        <span className="text-sm font-bold text-gray-400 mr-2">x{item.quantity}</span>
+                        <span className={`text-xs font-semibold px-2 py-1 rounded-lg border ${STATUS_COLOR[item.itemStatus]}`}>
+                          {STATUS_LABEL[item.itemStatus]}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* CANCELLED items */}
+              {cancelledItems.length > 0 && (
+                <div>
+                  <div className="space-y-2">
+                    {cancelledItems.map((item) => (
+                      <div key={item.orderItemId} className="flex items-center gap-3 bg-white rounded-xl p-3 shadow-sm border border-gray-100 opacity-40">
+                        <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${STATUS_DOT[item.itemStatus]}`} />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm text-gray-400 line-through truncate">{item.menuName}</p>
+                        </div>
+                        <span className="text-xs text-gray-400">x{item.quantity}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Empty */}
+              {!orderDetail && !errorMessage && (
+                <p className="text-center text-gray-400 py-10">ไม่พบรายการ</p>
+              )}
+            </div>
+          )}
+
+          {/* Complete All button */}
+          {!isLoading && activeItems.length > 0 && (
+            <div className="mt-8">
+              <button
+                onClick={() => void handleCompleteAll()}
+                className="w-full bg-[#d20000] hover:bg-red-700 text-white font-bold py-3.5 rounded-xl text-sm shadow-md transition-colors"
+              >
+                ทำเสร็จทั้งหมด ({activeItems.length} รายการ)
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </div>

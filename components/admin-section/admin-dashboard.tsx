@@ -209,10 +209,15 @@ export function AdminDashboard() {
     setMenus(Array.isArray(result.data) ? result.data : []);
   };
 
-  const loadReports = async () => {
+  const loadReports = async (dateFrom?: string, dateTo?: string) => {
+    // Default: current month
+    const now = new Date();
+    const firstDay = dateFrom ?? `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
+    const lastDay = dateTo ?? now.toISOString().split("T")[0];
+
     const [salesResult, topMenuResult] = await Promise.all([
-      adminService.getSalesReport(),
-      adminService.getTopMenusReport({ limit: 10 }),
+      adminService.getSalesReport({ dateFrom: firstDay, dateTo: lastDay, groupBy: "day" }),
+      adminService.getTopMenusReport({ dateFrom: firstDay, dateTo: lastDay, limit: 10 }),
     ]);
 
     if (salesResult.success) {
@@ -390,9 +395,8 @@ export function AdminDashboard() {
   const handleToggleMenuStatus = async (menuItem: MenuItem) => {
     clearAlerts();
 
-    const result = await adminService.updateMenuById(menuItem.menuId, {
-      menuStatus: !Boolean(menuItem.menuStatus),
-    });
+    // Use the dedicated PATCH /menus/:id/status endpoint
+    const result = await adminService.updateMenuStatus(menuItem.menuId, !Boolean(menuItem.menuStatus));
 
     if (!result.success) {
       setApiError(result.message);
@@ -1045,27 +1049,46 @@ export function AdminDashboard() {
               <div className="space-y-4">
                 <div className="grid gap-4 md:grid-cols-2">
                   <section className="rounded-3xl border border-black/8 bg-white p-4">
-                    <h3 className="text-base font-semibold">Sales Report</h3>
-                    <div className="mt-3 space-y-2">
-                      {salesReport.map((row) => (
-                        <div key={row.date} className="flex items-center justify-between rounded-xl bg-black/3 px-3 py-2 text-sm">
-                          <span>{row.date}</span>
-                          <span className="font-semibold">{row.totalSales.toFixed(2)} ฿</span>
-                        </div>
-                      ))}
-                    </div>
+                    <h3 className="text-base font-semibold">Sales Report (เดือนนี้)</h3>
+                    {salesReport.length === 0 ? (
+                      <p className="mt-3 text-sm text-black/40">ไม่มีข้อมูล</p>
+                    ) : (
+                      <div className="mt-3 space-y-2 max-h-80 overflow-y-auto">
+                        {salesReport.map((row) => (
+                          <div key={row.date} className="flex items-center justify-between rounded-xl bg-black/3 px-3 py-2 text-sm">
+                            <div>
+                              <span>{row.date}</span>
+                              <span className="ml-2 text-xs text-black/50">{row.totalOrders} orders</span>
+                            </div>
+                            <span className="font-semibold">{row.totalSales.toLocaleString()} ฿</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </section>
 
                   <section className="rounded-3xl border border-black/8 bg-white p-4">
-                    <h3 className="text-base font-semibold">Top Menus</h3>
-                    <div className="mt-3 space-y-2">
-                      {topMenuReport.map((row) => (
-                        <div key={row.menuId} className="flex items-center justify-between rounded-xl bg-black/3 px-3 py-2 text-sm">
-                          <span>{row.menuName}</span>
-                          <span className="font-semibold">{row.totalSold}</span>
-                        </div>
-                      ))}
-                    </div>
+                    <h3 className="text-base font-semibold">Top Menus (เดือนนี้)</h3>
+                    {topMenuReport.length === 0 ? (
+                      <p className="mt-3 text-sm text-black/40">ไม่มีข้อมูล</p>
+                    ) : (
+                      <div className="mt-3 space-y-2">
+                        {topMenuReport.map((row, idx) => (
+                          <div key={row.menuId} className="flex items-center justify-between rounded-xl bg-black/3 px-3 py-2 text-sm">
+                            <div className="flex items-center gap-2">
+                              <span className="w-5 text-xs font-bold text-black/40">#{idx + 1}</span>
+                              <span>{row.menuName}</span>
+                            </div>
+                            <div className="text-right">
+                              <span className="font-semibold">{row.totalQuantity ?? row.totalSold ?? 0} ชิ้น</span>
+                              {row.totalAmount != null && (
+                                <span className="ml-2 text-xs text-black/50">{row.totalAmount.toLocaleString()} ฿</span>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </section>
                 </div>
               </div>
@@ -1090,8 +1113,8 @@ export function AdminDashboard() {
                     <p className="text-xs text-black/55">Payment Detail</p>
                     <p className="mt-1 font-semibold">#{paymentDetail.paymentId}</p>
                     <p className="mt-1">Session: {paymentDetail.sessionId}</p>
-                    <p>Paid: {paymentDetail.paidAmount.toFixed(2)} ฿</p>
-                    <p>Change: {paymentDetail.changeAmount.toFixed(2)} ฿</p>
+                    <p>Total: {(paymentDetail.totalAmount ?? paymentDetail.paidAmount ?? 0).toFixed(2)} ฿</p>
+                    <p>Status: {paymentDetail.paymentStatus ?? "-"}</p>
                   </article>
                 ) : null}
 
@@ -1111,7 +1134,7 @@ export function AdminDashboard() {
                           <td className="px-4 py-3">{payment.paymentId}</td>
                           <td className="px-4 py-3">{payment.sessionId}</td>
                           <td className="px-4 py-3">{payment.paymentMethodName ?? "-"}</td>
-                          <td className="px-4 py-3">{payment.paidAmount.toFixed(2)} ฿</td>
+                          <td className="px-4 py-3">{(payment.totalAmount ?? payment.paidAmount ?? 0).toFixed(2)} ฿</td>
                         </tr>
                       ))}
                     </tbody>
@@ -1148,17 +1171,17 @@ export function AdminDashboard() {
                   <table className="min-w-full text-sm">
                     <thead className="bg-[#fcf4f1] text-left text-black/70">
                       <tr>
-                        <th className="px-4 py-3">Receipt No.</th>
                         <th className="px-4 py-3">Receipt ID</th>
-                        <th className="px-4 py-3">Payment</th>
+                        <th className="px-4 py-3">Receipt No.</th>
+                        <th className="px-4 py-3">Payment ID</th>
                         <th className="px-4 py-3">Total</th>
                       </tr>
                     </thead>
                     <tbody>
                       {receipts.map((receipt) => (
                         <tr key={receipt.receiptId} className="border-t border-black/8">
-                          <td className="px-4 py-3">{receipt.receiptNumber}</td>
                           <td className="px-4 py-3">{receipt.receiptId}</td>
+                          <td className="px-4 py-3">{receipt.receiptNumber}</td>
                           <td className="px-4 py-3">{receipt.paymentId}</td>
                           <td className="px-4 py-3">{receipt.totalAmount.toFixed(2)} ฿</td>
                         </tr>
@@ -1171,18 +1194,6 @@ export function AdminDashboard() {
           </section>
         </div>
       </div>
-
-      <EmployeeManageModal
-        isOpen={isManageModalOpen}
-        selectedEmployee={selectedEmployee}
-        updatePayload={updatePayload}
-        nextEmployeeStatus={nextEmployeeStatus}
-        roles={roles}
-        onClose={() => setIsManageModalOpen(false)}
-        onUpdatePayloadChange={setUpdatePayload}
-        onSubmitUpdate={handleUpdateEmployee}
-        onToggleStatus={handleUpdateEmployeeStatus}
-      />
     </main>
   );
 }

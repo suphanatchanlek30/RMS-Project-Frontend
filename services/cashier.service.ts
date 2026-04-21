@@ -113,20 +113,37 @@ export interface PaymentDetail {
   sessionId: number;
   paymentMethodId: number;
   paymentMethodName?: string;
-  paidAmount: number;
+  /** Total bill amount (API field: totalAmount) */
+  totalAmount: number;
+  /** Amount received from customer */
   receivedAmount: number;
+  /** Change returned to customer */
   changeAmount: number;
-  createdAt?: string;
+  paymentTime?: string;
+  paymentStatus?: string;
+  /** Alias for paidAmount (same as totalAmount) */
+  paidAmount?: number;
 }
 
 export interface ReceiptDetail {
   receiptId: number;
   receiptNumber: string;
-  paymentId: number;
-  sessionId: number;
-  tableNumber?: string;
-  totalAmount: number;
+  issueDate?: string;
   issuedAt?: string;
+  totalAmount: number;
+  payment?: {
+    paymentId: number;
+    paymentMethodName?: string;
+    paymentTime?: string;
+  };
+  table?: {
+    tableId: number;
+    tableNumber: string;
+  };
+  /** Alias kept for old components */
+  paymentId?: number;
+  sessionId?: number;
+  tableNumber?: string;
   items?: Array<{
     orderItemId?: number;
     menuName: string;
@@ -390,12 +407,46 @@ export const cashierService = {
     receivedAmount: number;
   }): Promise<CashierServiceResult<CashierCheckoutResult>> {
     try {
-      const response = await axiosInstance.post<ApiEnvelope<CashierCheckoutResult>>(`${API_PREFIX}/cashier/checkout`, payload);
+      const response = await axiosInstance.post<ApiEnvelope<CashierCheckoutResult>>(
+        `${API_PREFIX}/cashier/sessions/${payload.sessionId}/checkout`,
+        {
+          paymentMethodId: payload.paymentMethodId,
+          receivedAmount: payload.receivedAmount,
+        }
+      );
       return response.data;
     } catch (error) {
       return {
         success: false,
         message: getErrorMessage(error, "ชำระเงินไม่สำเร็จ"),
+      };
+    }
+  },
+
+  async getBillSummary(sessionId: number): Promise<CashierServiceResult<BillSummary>> {
+    try {
+      const response = await axiosInstance.get<ApiEnvelope<BillSummary>>(
+        `${API_PREFIX}/cashier/sessions/${sessionId}/bill`
+      );
+      return response.data;
+    } catch (error) {
+      return {
+        success: false,
+        message: getErrorMessage(error, "ดึงสรุปบิลไม่สำเร็จ"),
+      };
+    }
+  },
+
+  async getPaymentMethods(): Promise<CashierServiceResult<PaymentMethod[]>> {
+    try {
+      const response = await axiosInstance.get<ApiEnvelope<PaymentMethod[]>>(
+        `${API_PREFIX}/payment-methods`
+      );
+      return response.data;
+    } catch (error) {
+      return {
+        success: false,
+        message: getErrorMessage(error, "ดึงวิธีการชำระเงินไม่สำเร็จ"),
       };
     }
   },
