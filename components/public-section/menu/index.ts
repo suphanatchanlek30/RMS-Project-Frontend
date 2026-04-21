@@ -4,3 +4,5 @@ export * from "./restaurant-info-card";
 export * from "./category-tabs";
 export * from "./menu-item-card";
 export * from "./menu-list";
+export * from "./search-bar";
+export * from "./filter-panel";

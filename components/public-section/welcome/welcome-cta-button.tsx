@@ -1,4 +1,4 @@
-// components/public-session/welcome/welcome-cta-button.tsx
+// components/public-section/welcome/welcome-cta-button.tsx
 "use client";
 
 import { useRouter } from "next/navigation";

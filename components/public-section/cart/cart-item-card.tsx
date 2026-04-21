@@ -1,4 +1,4 @@
-// components/public-session/cart/cart-item-card.tsx
+// components/public-section/cart/cart-item-card.tsx
 "use client";
 
 import Image from "next/image";

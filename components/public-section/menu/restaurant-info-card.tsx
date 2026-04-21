@@ -1,4 +1,4 @@
-// components/public-session/menu/restaurant-info-card.tsx
+// components/public-section/menu/restaurant-info-card.tsx
 import Image from "next/image";
 import type { RestaurantInfo } from "../public-section.types";
 

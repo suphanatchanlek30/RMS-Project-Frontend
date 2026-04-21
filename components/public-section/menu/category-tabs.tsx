@@ -1,4 +1,4 @@
-// components/public-session/menu/category-tabs.tsx
+// components/public-section/menu/category-tabs.tsx
 "use client";
 
 import type { Category } from "../public-section.types";

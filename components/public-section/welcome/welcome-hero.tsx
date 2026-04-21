@@ -1,4 +1,4 @@
-// components/public-session/welcome/welcome-hero.tsx
+// components/public-section/welcome/welcome-hero.tsx
 import Image from "next/image";
 
 interface WelcomeHeroProps {

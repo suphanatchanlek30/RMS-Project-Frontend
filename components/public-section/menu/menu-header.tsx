@@ -1,4 +1,4 @@
-// components/public-session/menu/menu-header.tsx
+// components/public-section/menu/menu-header.tsx
 "use client";
 
 import Link from "next/link";
@@ -21,7 +21,7 @@ export function MenuHeader({ tableNumber }: MenuHeaderProps) {
       {/* Icons right */}
       <div className="flex items-center gap-3">
         {/* Order history icon */}
-        <Link href="/bills" aria-label="ใบเสร็จ">
+        <Link href="/home/bills" aria-label="ใบเสร็จ">
           <div className="flex h-9 w-9 items-center justify-center rounded-full border border-gray-200 bg-white shadow-sm text-gray-600 hover:bg-gray-50 transition-colors">
             <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <rect x="5" y="2" width="14" height="20" rx="2" />
@@ -33,7 +33,7 @@ export function MenuHeader({ tableNumber }: MenuHeaderProps) {
         </Link>
 
         {/* Cart icon with badge */}
-        <Link href="/cart" aria-label="ตะกร้า">
+        <Link href="/home/cart" aria-label="ตะกร้า">
           <div className="relative flex h-9 w-9 items-center justify-center rounded-full border border-gray-200 bg-white shadow-sm text-gray-600 hover:bg-gray-50 transition-colors">
             <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <circle cx="9" cy="21" r="1" />

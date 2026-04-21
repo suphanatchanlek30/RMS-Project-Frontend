@@ -109,7 +109,7 @@ export default function MenuDetailPage({ params }: MenuDetailPageProps) {
         {item.options && item.options.length > 0 && (
           <div className="mt-5 px-4">
             <p className="mb-2 text-sm font-semibold text-gray-700">
-              เลือกเนื้อสัตว์
+              ตัวเลือก
             </p>
             <div className="divide-y divide-gray-100 rounded-xl border border-gray-100 bg-gray-50 px-3">
               {item.options.map((opt) => (

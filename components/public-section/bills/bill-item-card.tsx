@@ -1,4 +1,4 @@
-// components/public-session/bills/bill-item-card.tsx
+// components/public-section/bills/bill-item-card.tsx
 import type { OrderBillItem } from "../public-section.types";
 
 const STATUS_LABELS: Record<OrderBillItem["status"], string> = {

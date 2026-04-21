@@ -1,4 +1,4 @@
-// components/public-session/public-section.types.ts
+// components/public-section/public-section.types.ts
 
 export interface MenuOption {
   id: string;

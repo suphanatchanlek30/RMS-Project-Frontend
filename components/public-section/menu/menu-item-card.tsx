@@ -1,4 +1,4 @@
-// components/public-session/menu/menu-item-card.tsx
+// components/public-section/menu/menu-item-card.tsx
 import Image from "next/image";
 import Link from "next/link";
 import type { MenuItem } from "../public-section.types";
@@ -9,7 +9,7 @@ interface MenuItemCardProps {
 
 export function MenuItemCard({ item }: MenuItemCardProps) {
   return (
-    <Link href={`/menu/${item.id}`} className="block">
+    <Link href={`/home/menu/${item.id}`} className="block">
       <div className="flex items-center gap-3 py-3 px-4 hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-b-0">
         {/* Image */}
         <div className="relative h-16 w-16 flex-shrink-0 overflow-hidden rounded-xl bg-gray-100">

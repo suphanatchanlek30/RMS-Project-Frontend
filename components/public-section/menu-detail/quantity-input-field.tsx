@@ -1,4 +1,4 @@
-// components/public-session/menu-detail/quantity-selector.tsx
+// components/public-section/menu-detail/quantity-selector.tsx
 "use client";
 
 interface QuantityInputFieldProps {

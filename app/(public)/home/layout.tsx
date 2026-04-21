@@ -1,4 +1,4 @@
-// app/(public-session)/layout.tsx
+// app/(public)/home/layout.tsx
 import type { ReactNode } from "react";
 import { CartProvider } from "@/components/public-section/cart-context";
 

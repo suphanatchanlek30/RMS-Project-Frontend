@@ -1,4 +1,4 @@
-// components/public-session/menu-detail/option-checkbox.tsx
+// components/public-section/menu-detail/option-checkbox.tsx
 "use client";
 
 interface OptionInputFieldProps {

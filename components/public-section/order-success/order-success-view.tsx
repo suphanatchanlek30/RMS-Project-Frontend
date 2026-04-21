@@ -1,4 +1,4 @@
-// components/public-session/order-success/order-success-view.tsx
+// components/public-section/order-success/order-success-view.tsx
 "use client";
 
 import { useRouter } from "next/navigation";

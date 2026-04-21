@@ -1,4 +1,4 @@
-// components/public-session/cart-context.tsx
+// components/public-section/cart-context.tsx
 "use client";
 
 import {
