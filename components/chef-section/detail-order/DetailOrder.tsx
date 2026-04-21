@@ -1,8 +1,10 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { LogOut, ChevronDown, Check } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { authSession } from '@/services/authSession';
+import { chefService, type ChefOrderDetail } from '@/services/chef.service';
 
 const Spark = ({ className }: { className?: string }) => (
   <svg viewBox="0 0 24 24" className={className} fill="currentColor">
@@ -10,7 +12,16 @@ const Spark = ({ className }: { className?: string }) => (
   </svg>
 );
 
-const TabButton = ({ active, onClick, label, count, countColor = "bg-gray-200 text-gray-800", activeColor = "bg-[#d20000] text-white" }: any) => {
+interface TabButtonProps {
+  active: boolean;
+  onClick: () => void;
+  label: string;
+  count: number;
+  countColor?: string;
+  activeColor?: string;
+}
+
+const TabButton = ({ active, onClick, label, count, countColor = "bg-gray-200 text-gray-800", activeColor = "bg-[#d20000] text-white" }: TabButtonProps) => {
   return (
     <button
       onClick={onClick}
@@ -19,7 +30,7 @@ const TabButton = ({ active, onClick, label, count, countColor = "bg-gray-200 te
     >
       <span className="font-semibold text-sm">{label}</span>
       {count !== undefined && count > 0 && (
-        <span className={`flex items-center justify-center min-w-[20px] h-[20px] rounded-full text-xs font-bold px-1.5
+        <span className={`flex items-center justify-center min-w-5 h-5 rounded-full text-xs font-bold px-1.5
           ${active && activeColor.includes('red') ? 'bg-white text-red-600' : countColor + (countColor.includes('yellow') ? ' text-gray-800' : ' text-white')}`}>
           {count}
         </span>
@@ -32,27 +43,93 @@ export default function DetailOrder({ orderId }: { orderId: string }) {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState('All Order');
   const [isSubmitted, setIsSubmitted] = useState(false);
+  const [orderDetail, setOrderDetail] = useState<ChefOrderDetail | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  // Hardcode counts for UI representation
-  const allCount = 9;
-  const newOrdersCount = 3;
-  const preparingCount = 3;
-  const completedCount = 3;
+  useEffect(() => {
+    const loadOrderDetail = async () => {
+      setIsLoading(true);
+      setErrorMessage(null);
+
+      const response = await chefService.getKitchenOrderById(orderId);
+      if (!response.success || !response.data) {
+        setErrorMessage(response.message);
+        setOrderDetail(null);
+        setIsLoading(false);
+        return;
+      }
+
+      setOrderDetail(response.data);
+      setIsLoading(false);
+    };
+
+    void loadOrderDetail();
+  }, [orderId]);
+
+  const employeeName = useMemo(() => authSession.getEmployeeProfile()?.employeeName ?? 'Chef', []);
+
+  const allCount = orderDetail ? 1 : 0;
+  const newOrdersCount = orderDetail?.status === 'new' ? 1 : 0;
+  const preparingCount = orderDetail?.status === 'preparing' ? 1 : 0;
+  const completedCount = orderDetail?.status === 'completed' ? 1 : 0;
   const historyCount = 0;
 
-  // Mock list items state roughly matching the image
-  const [items, setItems] = useState([
-    { id: 1, name: 'กะเพรา (หมูสับ / ไก่ / หมูกรอบ / ทะเล) ราดข้าว', options: '• หมูสับ', qty: 1, done: false },
-    { id: 2, name: 'กะเพรา (หมูสับ / ไก่ / หมูกรอบ / ทะเล) ราดข้าว', options: '• หมูสับ', qty: 1, done: false },
-    { id: 3, name: 'กะเพรา (หมูสับ / ไก่ / หมูกรอบ / ทะเล) ราดข้าว', options: '• หมูสับ', qty: 1, done: true },
-  ]);
+  const pendingItems = orderDetail?.items.filter((item) => item.itemStatus !== 'completed') ?? [];
+  const completedItems = orderDetail?.items.filter((item) => item.itemStatus === 'completed') ?? [];
 
-  const toggleItem = (id: number) => {
-    setItems(items.map(item => item.id === id ? { ...item, done: !item.done } : item));
+  const markItemReady = async (itemId: number) => {
+    setErrorMessage(null);
+
+    const response = await chefService.updateOrderItemStatus(itemId, 'READY');
+    if (!response.success) {
+      setErrorMessage(response.message);
+      return;
+    }
+
+    setOrderDetail((current) => {
+      if (!current) return current;
+      return {
+        ...current,
+        items: current.items.map((item) =>
+          item.orderItemId === itemId ? { ...item, itemStatus: 'completed' } : item
+        ),
+      };
+    });
   };
 
-  const pendingItems = items.filter(item => !item.done);
-  const completedItems = items.filter(item => item.done);
+  const handleSubmitOrder = async () => {
+    if (!pendingItems.length) {
+      setIsSubmitted(true);
+      return;
+    }
+
+    setIsSubmitting(true);
+    setErrorMessage(null);
+
+    const results = await Promise.all(
+      pendingItems.map((item) => chefService.updateOrderItemStatus(item.orderItemId, 'READY'))
+    );
+
+    const failedResult = results.find((result) => !result.success);
+    if (failedResult) {
+      setErrorMessage(failedResult.message);
+      setIsSubmitting(false);
+      return;
+    }
+
+    setOrderDetail((current) => {
+      if (!current) return current;
+      return {
+        ...current,
+        status: 'completed',
+        items: current.items.map((item) => ({ ...item, itemStatus: 'completed' })),
+      };
+    });
+    setIsSubmitting(false);
+    setIsSubmitted(true);
+  };
 
   return (
     <div className="min-h-screen bg-white font-sans flex flex-col">
@@ -64,7 +141,7 @@ export default function DetailOrder({ orderId }: { orderId: string }) {
           
           <div className="flex items-center justify-between px-6 py-5 relative z-10">
             <div className="bg-white rounded-md px-8 py-2.5 shadow-sm">
-              <span className="font-bold text-gray-800">นาย XXX XXX</span>
+              <span className="font-bold text-gray-800">{employeeName}</span>
             </div>
             
             <div className="flex items-center gap-6 text-white mr-2">
@@ -87,7 +164,7 @@ export default function DetailOrder({ orderId }: { orderId: string }) {
               <TabButton active={activeTab === 'History'} onClick={() => setActiveTab('History')} label="History" count={historyCount} />
             </div>
             
-            <div className="flex flex-shrink-0 items-center bg-[#f8f9fa] border border-gray-200 rounded-full px-5 py-2 cursor-pointer shadow-sm hover:bg-gray-50 transition-colors">
+            <div className="flex shrink-0 items-center bg-[#f8f9fa] border border-gray-200 rounded-full px-5 py-2 cursor-pointer shadow-sm hover:bg-gray-50 transition-colors">
               <span className="text-[13px] font-semibold mr-2 text-gray-800">Lastest Order</span>
               <ChevronDown size={18} className="text-gray-600" />
             </div>
@@ -96,7 +173,7 @@ export default function DetailOrder({ orderId }: { orderId: string }) {
           {/* Centered Detail Card */}
           <div className="flex justify-center w-full flex-1 mb-8">
             {isSubmitted ? (
-              <div className="bg-[#f2f2f2] rounded-[24px] p-8 w-full max-w-[450px] shadow-sm flex flex-col border border-gray-200 justify-center items-center relative overflow-hidden min-h-[450px]">
+              <div className="bg-[#f2f2f2] rounded-3xl p-8 w-full max-w-[450px] shadow-sm flex flex-col border border-gray-200 justify-center items-center relative overflow-hidden min-h-[450px]">
                 {/* Success Animation Area */}
                 <div className="flex-1 flex flex-col items-center justify-center w-full relative">
                   <div className="relative w-full h-40 flex items-center justify-center -mt-8">
@@ -107,7 +184,7 @@ export default function DetailOrder({ orderId }: { orderId: string }) {
                      <Spark className="absolute text-[#e04040] w-3 h-3 top-20 left-[15%] opacity-90" />
                      <Spark className="absolute text-[#cc0000] w-4 h-4 bottom-8 right-[25%]" />
                      <Spark className="absolute text-[#e04040] w-7 h-7 bottom-4 right-[15%] opacity-60" />
-                     <div className="absolute w-[5px] h-[5px] rounded-full bg-[#f08080] top-[30%] right-[40%]" />
+                     <div className="absolute w-1.25 h-1.25 rounded-full bg-[#f08080] top-[30%] right-[40%]" />
                      <div className="absolute w-1 h-1 rounded-full bg-[#e04040] bottom-[20%] left-[20%]" />
 
                      {/* Main Circle */}
@@ -125,13 +202,28 @@ export default function DetailOrder({ orderId }: { orderId: string }) {
                 </div>
               </div>
             ) : (
-            <div className="bg-[#f2f2f2] rounded-[24px] p-8 w-full max-w-[450px] shadow-sm flex flex-col border border-gray-200">
+            <div className="bg-[#f2f2f2] rounded-3xl p-8 w-full max-w-[450px] shadow-sm flex flex-col border border-gray-200">
               {/* Order ID Tag */}
               <div className="mb-6 flex">
                 <div className="bg-white px-5 py-2 rounded-lg font-bold text-[14px] shadow-sm text-gray-800">
-                  {orderId.toUpperCase()}
+                  {orderDetail?.tableLabel ?? orderId.toUpperCase()}
                 </div>
               </div>
+
+              {errorMessage ? (
+                <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                  {errorMessage}
+                </div>
+              ) : null}
+
+              {isLoading ? (
+                <div className="space-y-3">
+                  {Array.from({ length: 3 }, (_, index) => (
+                    <div key={index} className="h-16 animate-pulse rounded-xl bg-white/80" />
+                  ))}
+                </div>
+              ) : (
+                <>
 
               {/* Pending Items */}
               {pendingItems.length > 0 && (
@@ -139,17 +231,17 @@ export default function DetailOrder({ orderId }: { orderId: string }) {
                   <h3 className="font-bold text-[13px] text-gray-800 mb-4 ml-1">รายการที่ยังไม่ได้ทำ</h3>
                   <div className="space-y-3">
                     {pendingItems.map((item) => (
-                      <div key={item.id} className="flex items-center gap-4">
-                        <button onClick={() => toggleItem(item.id)} className="flex-shrink-0 flex items-center justify-center w-7">
-                          <div className={`w-[20px] h-[20px] rounded-full border-[2px] border-[#222] flex items-center justify-center bg-transparent transition-colors`}>
+                      <div key={item.orderItemId} className="flex items-center gap-4">
+                        <button onClick={() => void markItemReady(item.orderItemId)} className="shrink-0 flex items-center justify-center w-7">
+                          <div className={`w-5 h-5 rounded-full border-2 border-[#222] flex items-center justify-center bg-transparent transition-colors`}>
                           </div>
                         </button>
                         <div className="bg-white px-4 py-2.5 rounded-lg flex-1 flex justify-between gap-4 shadow-sm h-full items-center">
                           <div className="flex flex-col flex-1">
-                            <span className="text-[11px] font-medium text-gray-800 leading-snug break-words">{item.name}</span>
-                            <span className="text-[10px] text-gray-500 mt-1">{item.options}</span>
+                            <span className="text-[11px] font-medium text-gray-800 leading-snug wrap-break-word">{item.menuName}</span>
+                            <span className="text-[10px] text-gray-500 mt-1">{item.note ? `• ${item.note}` : 'กำลังเตรียม'}</span>
                           </div>
-                          <span className="text-[11px] font-bold text-gray-500">x{item.qty}</span>
+                          <span className="text-[11px] font-bold text-gray-500">x{item.quantity}</span>
                         </div>
                       </div>
                     ))}
@@ -163,18 +255,18 @@ export default function DetailOrder({ orderId }: { orderId: string }) {
                   <h3 className="font-bold text-[13px] text-gray-800 mb-4 ml-1 mt-4">รายการที่เสร็จสิ้น</h3>
                   <div className="space-y-3">
                     {completedItems.map((item) => (
-                      <div key={item.id} className="flex items-center gap-4">
-                        <button onClick={() => toggleItem(item.id)} className="flex-shrink-0 flex items-center justify-center w-7">
-                          <div className={`w-[20px] h-[20px] rounded-full border-[2px] border-[#222] flex items-center justify-center bg-transparent transition-colors`}>
-                             <div className="w-[10px] h-[10px] rounded-full bg-[#222]" />
+                      <div key={item.orderItemId} className="flex items-center gap-4">
+                        <button className="shrink-0 flex items-center justify-center w-7">
+                          <div className={`w-5 h-5 rounded-full border-2 border-[#222] flex items-center justify-center bg-transparent transition-colors`}>
+                             <div className="w-2.5 h-2.5 rounded-full bg-[#222]" />
                           </div>
                         </button>
                         <div className="bg-white px-4 py-2.5 rounded-lg flex-1 flex justify-between gap-4 shadow-sm h-full items-center opacity-90">
                           <div className="flex flex-col flex-1">
-                            <span className="text-[11px] font-medium text-gray-800 leading-snug break-words">{item.name}</span>
-                            <span className="text-[10px] text-gray-500 mt-1">{item.options}</span>
+                            <span className="text-[11px] font-medium text-gray-800 leading-snug wrap-break-word">{item.menuName}</span>
+                            <span className="text-[10px] text-gray-500 mt-1">{item.note ? `• ${item.note}` : 'พร้อมเสิร์ฟ'}</span>
                           </div>
-                          <span className="text-[11px] font-bold text-gray-500">x{item.qty}</span>
+                          <span className="text-[11px] font-bold text-gray-500">x{item.quantity}</span>
                         </div>
                       </div>
                     ))}
@@ -184,10 +276,12 @@ export default function DetailOrder({ orderId }: { orderId: string }) {
 
               {/* Send Order Button */}
               <div className="mt-auto flex justify-center pt-8 pb-2">
-                <button onClick={() => setIsSubmitted(true)} className="bg-[#d20000] hover:bg-red-700 text-white font-bold py-2.5 px-8 rounded-lg transition-colors text-sm w-[200px] shadow-md">
-                  Send Order
+                <button onClick={() => void handleSubmitOrder()} disabled={isSubmitting || isLoading} className="bg-[#d20000] hover:bg-red-700 text-white font-bold py-2.5 px-8 rounded-lg transition-colors text-sm w-50 shadow-md disabled:cursor-not-allowed disabled:opacity-60">
+                  {isSubmitting ? 'Sending...' : 'Send Order'}
                 </button>
               </div>
+                </>
+              )}
             </div>
             )}
           </div>

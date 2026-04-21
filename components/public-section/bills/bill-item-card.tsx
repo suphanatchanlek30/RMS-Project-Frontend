@@ -2,9 +2,9 @@
 import type { OrderBillItem } from "../public-section.types";
 
 const STATUS_LABELS: Record<OrderBillItem["status"], string> = {
-  preparing: "preparing",
-  ready: "ready",
-  served: "served",
+  preparing: "Preparing",
+  ready: "Ready",
+  served: "Served",
 };
 
 const STATUS_COLORS: Record<OrderBillItem["status"], string> = {

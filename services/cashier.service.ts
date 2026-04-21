@@ -100,6 +100,42 @@ export interface CashierCheckoutResult {
   changeAmount: number;
 }
 
+export interface SessionCloseResult {
+  sessionId: number;
+  sessionStatus: SessionStatus;
+  tableId: number;
+  tableStatus: TableStatus;
+  endTime?: string | null;
+}
+
+export interface PaymentDetail {
+  paymentId: number;
+  sessionId: number;
+  paymentMethodId: number;
+  paymentMethodName?: string;
+  paidAmount: number;
+  receivedAmount: number;
+  changeAmount: number;
+  createdAt?: string;
+}
+
+export interface ReceiptDetail {
+  receiptId: number;
+  receiptNumber: string;
+  paymentId: number;
+  sessionId: number;
+  tableNumber?: string;
+  totalAmount: number;
+  issuedAt?: string;
+  items?: Array<{
+    orderItemId?: number;
+    menuName: string;
+    quantity: number;
+    unitPrice: number;
+    lineTotal: number;
+  }>;
+}
+
 interface ApiEnvelope<T> {
   success: boolean;
   message: string;
@@ -171,6 +207,60 @@ export const cashierService = {
       return {
         success: false,
         message: getErrorMessage(error, "เปิดโต๊ะไม่สำเร็จ"),
+      };
+    }
+  },
+
+  async getSessionById(sessionId: number): Promise<CashierServiceResult<TableSession>> {
+    try {
+      const response = await axiosInstance.get<ApiEnvelope<TableSession>>(`${API_PREFIX}/table-sessions/${sessionId}`);
+      return response.data;
+    } catch (error) {
+      return {
+        success: false,
+        message: getErrorMessage(error, "ดึงรายละเอียด session ไม่สำเร็จ"),
+      };
+    }
+  },
+
+  async closeSession(payload: {
+    sessionId: number;
+    employeeId?: number;
+  }): Promise<CashierServiceResult<SessionCloseResult>> {
+    try {
+      const response = await axiosInstance.patch<ApiEnvelope<SessionCloseResult>>(
+        `${API_PREFIX}/table-sessions/${payload.sessionId}/close`,
+        payload.employeeId ? { employeeId: payload.employeeId } : {}
+      );
+      return response.data;
+    } catch (error) {
+      return {
+        success: false,
+        message: getErrorMessage(error, "ปิด session ไม่สำเร็จ"),
+      };
+    }
+  },
+
+  async getPaymentById(paymentId: number): Promise<CashierServiceResult<PaymentDetail>> {
+    try {
+      const response = await axiosInstance.get<ApiEnvelope<PaymentDetail>>(`${API_PREFIX}/payments/${paymentId}`);
+      return response.data;
+    } catch (error) {
+      return {
+        success: false,
+        message: getErrorMessage(error, "ดึงรายละเอียดการชำระเงินไม่สำเร็จ"),
+      };
+    }
+  },
+
+  async getReceiptById(receiptId: number): Promise<CashierServiceResult<ReceiptDetail>> {
+    try {
+      const response = await axiosInstance.get<ApiEnvelope<ReceiptDetail>>(`${API_PREFIX}/receipts/${receiptId}`);
+      return response.data;
+    } catch (error) {
+      return {
+        success: false,
+        message: getErrorMessage(error, "ดึงรายละเอียดใบเสร็จไม่สำเร็จ"),
       };
     }
   },

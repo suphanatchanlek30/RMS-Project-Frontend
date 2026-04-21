@@ -1,7 +1,18 @@
 import type { ComponentType } from "react";
-import { LayoutDashboard, ShieldCheck, Users, UserRoundPlus, ListChecks, LogOut, X } from "lucide-react";
+import { LayoutDashboard, ShieldCheck, Users, UserRoundPlus, ListChecks, LogOut, X, Table2, BookType, UtensilsCrossed, ChartColumnBig, CreditCard, Receipt } from "lucide-react";
 
-export type AdminTab = "overview" | "roles" | "employees" | "create" | "detail";
+export type AdminTab =
+  | "overview"
+  | "roles"
+  | "employees"
+  | "create"
+  | "detail"
+  | "tables"
+  | "categories"
+  | "menus"
+  | "reports"
+  | "payments"
+  | "receipts";
 
 const TAB_ITEMS: Array<{ id: AdminTab; label: string; icon: ComponentType<{ className?: string }> }> = [
   { id: "overview", label: "Overview", icon: LayoutDashboard },
@@ -9,6 +20,12 @@ const TAB_ITEMS: Array<{ id: AdminTab; label: string; icon: ComponentType<{ clas
   { id: "employees", label: "Employees", icon: Users },
   { id: "create", label: "Create Employee", icon: UserRoundPlus },
   { id: "detail", label: "Manage By ID", icon: ListChecks },
+  { id: "tables", label: "Tables", icon: Table2 },
+  { id: "categories", label: "Categories", icon: BookType },
+  { id: "menus", label: "Menus", icon: UtensilsCrossed },
+  { id: "reports", label: "Reports", icon: ChartColumnBig },
+  { id: "payments", label: "Payments", icon: CreditCard },
+  { id: "receipts", label: "Receipts", icon: Receipt },
 ];
 
 interface AdminSidebarProps {

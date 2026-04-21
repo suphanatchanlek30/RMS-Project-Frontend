@@ -13,7 +13,9 @@ export default function CashierTableMenu({ tableId }: { tableId: string }) {
   const [currentSession, setCurrentSession] = useState<TableSession | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isOpening, setIsOpening] = useState(false);
+  const [isClosing, setIsClosing] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   useEffect(() => {
     const numericTableId = Number(tableId);
@@ -21,6 +23,7 @@ export default function CashierTableMenu({ tableId }: { tableId: string }) {
     const loadTableContext = async () => {
       setIsLoading(true);
       setErrorMessage(null);
+      setSuccessMessage(null);
 
       const [tableResponse, sessionResponse] = await Promise.all([
         cashierService.getTableById(numericTableId),
@@ -56,6 +59,7 @@ export default function CashierTableMenu({ tableId }: { tableId: string }) {
 
     setIsOpening(true);
     setErrorMessage(null);
+    setSuccessMessage(null);
     const response = await cashierService.openTableSession({
       tableId: Number(tableId),
       employeeId: employeeProfile.employeeId,
@@ -78,6 +82,52 @@ export default function CashierTableMenu({ tableId }: { tableId: string }) {
     );
     setIsOpening(false);
     router.push(`/cashier/table/${tableId}/qr`);
+  };
+
+  const handleCloseSession = async () => {
+    if (!currentSession || currentSession.sessionStatus !== "OPEN") {
+      setErrorMessage("ไม่พบ session ที่เปิดอยู่");
+      return;
+    }
+
+    const employeeProfile = authSession.getEmployeeProfile();
+
+    setIsClosing(true);
+    setErrorMessage(null);
+    setSuccessMessage(null);
+
+    const response = await cashierService.closeSession({
+      sessionId: currentSession.sessionId,
+      employeeId: employeeProfile?.employeeId,
+    });
+
+    if (!response.success || !response.data) {
+      setErrorMessage(response.message);
+      setIsClosing(false);
+      return;
+    }
+
+    const closeData = response.data;
+
+    setCurrentSession((previous) =>
+      previous
+        ? {
+            ...previous,
+            sessionStatus: closeData.sessionStatus,
+            endTime: closeData.endTime ?? null,
+          }
+        : previous
+    );
+    setTable((previous) =>
+      previous
+        ? {
+            ...previous,
+            tableStatus: closeData.tableStatus,
+          }
+        : previous
+    );
+    setSuccessMessage("ปิด session เรียบร้อยแล้ว");
+    setIsClosing(false);
   };
 
   return (
@@ -140,6 +190,12 @@ export default function CashierTableMenu({ tableId }: { tableId: string }) {
                   {errorMessage}
                 </div>
               ) : null}
+
+              {successMessage ? (
+                <div className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+                  {successMessage}
+                </div>
+              ) : null}
             </section>
 
             <div className="flex flex-col gap-4">
@@ -165,6 +221,14 @@ export default function CashierTableMenu({ tableId }: { tableId: string }) {
               className="rounded-3xl bg-(--bg) py-5 text-2xl font-bold shadow transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-50"
             >
               Check Bills
+            </button>
+
+            <button
+              onClick={handleCloseSession}
+              disabled={!canUseSessionActions || isClosing}
+              className="rounded-3xl bg-black/85 py-5 text-2xl font-bold text-white shadow transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {isClosing ? "Closing..." : "Close Session"}
             </button>
 
               <div className="mx-auto mt-2 w-fit rounded-2xl border border-white/40 bg-white/20 px-5 py-3 text-center text-sm font-semibold text-white">

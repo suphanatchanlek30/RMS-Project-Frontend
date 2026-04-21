@@ -12,12 +12,17 @@ export interface MenuItem {
   price: number;
   imageUrl: string;
   categoryId: string;
+  categoryName?: string;
+  description?: string;
+  menuId?: number;
   options?: MenuOption[];
 }
 
 export interface Category {
   id: string;
   label: string;
+  categoryId?: number;
+  description?: string;
 }
 
 export interface CartItem {
@@ -27,6 +32,7 @@ export interface CartItem {
   selectedOptions: string[];
   note: string;
   totalPrice: number;
+  menuId?: number;
 }
 
 export interface OrderBillItem {
@@ -42,4 +48,9 @@ export interface RestaurantInfo {
   logoUrl: string;
   logoAlt: string;
   address: string;
+}
+
+export interface ActiveTableInfo {
+  tableId: number;
+  tableNumber: string;
 }

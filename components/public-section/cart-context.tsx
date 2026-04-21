@@ -41,7 +41,15 @@ export function CartProvider({ children }: { children: ReactNode }) {
       const cartItemId = `${menuItem.id}-${Date.now()}`;
       setItems((prev) => [
         ...prev,
-        { cartItemId, menuItem, quantity, selectedOptions, note, totalPrice },
+        {
+          cartItemId,
+          menuItem,
+          menuId: menuItem.menuId,
+          quantity,
+          selectedOptions,
+          note,
+          totalPrice,
+        },
       ]);
     },
     []

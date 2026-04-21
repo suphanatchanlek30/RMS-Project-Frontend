@@ -1,7 +1,25 @@
 "use client";
 
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-import { adminService, type CreateEmployeePayload, type DashboardSummary, type EmployeeItem, type EmployeeQueryParams, type RoleItem, type UpdateEmployeePayload } from "@/services/admin.service";
+import {
+  adminService,
+  type AdminTableItem,
+  type CategoryItem,
+  type CreateCategoryPayload,
+  type CreateEmployeePayload,
+  type CreateMenuPayload,
+  type CreateTablePayload,
+  type DashboardSummary,
+  type EmployeeItem,
+  type EmployeeQueryParams,
+  type MenuItem,
+  type PaymentItem,
+  type ReceiptItem,
+  type RoleItem,
+  type SalesReportItem,
+  type TopMenuReportItem,
+  type UpdateEmployeePayload,
+} from "@/services/admin.service";
 import { AdminSidebar, type AdminTab } from "./dashboard/admin-sidebar";
 import { AdminTopbar } from "./dashboard/admin-topbar";
 import { EmployeesTable } from "./dashboard/employees-table";
@@ -25,12 +43,39 @@ const initialUpdatePayload: UpdateEmployeePayload = {
   roleId: 2,
 };
 
+const initialTablePayload: CreateTablePayload = {
+  tableNumber: "",
+  capacity: 4,
+  tableStatus: "AVAILABLE",
+};
+
+const initialCategoryPayload: CreateCategoryPayload = {
+  categoryName: "",
+  description: "",
+  categoryStatus: true,
+};
+
+const initialMenuPayload: CreateMenuPayload = {
+  menuName: "",
+  price: 0,
+  categoryId: 0,
+  description: "",
+  imageUrl: "",
+  menuStatus: true,
+};
+
 const tabTitleMap: Record<AdminTab, string> = {
   overview: "Admin Overview",
   roles: "Roles",
   employees: "Employees",
   create: "Create Employee",
   detail: "Manage By ID",
+  tables: "Tables",
+  categories: "Categories",
+  menus: "Menus",
+  reports: "Reports",
+  payments: "Payments",
+  receipts: "Receipts",
 };
 
 export function AdminDashboard() {
@@ -60,6 +105,26 @@ export function AdminDashboard() {
   const [updatePayload, setUpdatePayload] = useState<UpdateEmployeePayload>(initialUpdatePayload);
   const [nextEmployeeStatus, setNextEmployeeStatus] = useState<boolean>(true);
   const [isManageModalOpen, setIsManageModalOpen] = useState(false);
+
+  const [tables, setTables] = useState<AdminTableItem[]>([]);
+  const [tablePayload, setTablePayload] = useState<CreateTablePayload>(initialTablePayload);
+
+  const [categories, setCategories] = useState<CategoryItem[]>([]);
+  const [categoryPayload, setCategoryPayload] = useState<CreateCategoryPayload>(initialCategoryPayload);
+
+  const [menus, setMenus] = useState<MenuItem[]>([]);
+  const [menuPayload, setMenuPayload] = useState<CreateMenuPayload>(initialMenuPayload);
+
+  const [salesReport, setSalesReport] = useState<SalesReportItem[]>([]);
+  const [topMenuReport, setTopMenuReport] = useState<TopMenuReportItem[]>([]);
+
+  const [payments, setPayments] = useState<PaymentItem[]>([]);
+  const [paymentLookupId, setPaymentLookupId] = useState("");
+  const [paymentDetail, setPaymentDetail] = useState<PaymentItem | null>(null);
+
+  const [receipts, setReceipts] = useState<ReceiptItem[]>([]);
+  const [receiptLookupId, setReceiptLookupId] = useState("");
+  const [receiptDetail, setReceiptDetail] = useState<ReceiptItem | null>(null);
 
   const clearAlerts = () => {
     setApiMessage("");
@@ -110,6 +175,77 @@ export function AdminDashboard() {
     setDashboardSummary(summaryResult.data);
   };
 
+  const loadTables = async () => {
+    const result = await adminService.getTables();
+    if (!result.success) {
+      setApiError(result.message);
+      return;
+    }
+    setTables(Array.isArray(result.data) ? result.data : []);
+  };
+
+  const loadCategories = async () => {
+    const result = await adminService.getCategories();
+    if (!result.success) {
+      setApiError(result.message);
+      return;
+    }
+    const categoryList = Array.isArray(result.data) ? result.data : [];
+    setCategories(categoryList);
+    if (categoryList.length > 0) {
+      setMenuPayload((prev) => ({
+        ...prev,
+        categoryId: prev.categoryId || categoryList[0].categoryId,
+      }));
+    }
+  };
+
+  const loadMenus = async () => {
+    const result = await adminService.getMenus();
+    if (!result.success) {
+      setApiError(result.message);
+      return;
+    }
+    setMenus(Array.isArray(result.data) ? result.data : []);
+  };
+
+  const loadReports = async () => {
+    const [salesResult, topMenuResult] = await Promise.all([
+      adminService.getSalesReport(),
+      adminService.getTopMenusReport({ limit: 10 }),
+    ]);
+
+    if (salesResult.success) {
+      setSalesReport(Array.isArray(salesResult.data) ? salesResult.data : []);
+    } else {
+      setApiError(salesResult.message);
+    }
+
+    if (topMenuResult.success) {
+      setTopMenuReport(Array.isArray(topMenuResult.data) ? topMenuResult.data : []);
+    } else {
+      setApiError(topMenuResult.message);
+    }
+  };
+
+  const loadPayments = async () => {
+    const result = await adminService.getPayments({ page: 1, limit: 20 });
+    if (!result.success) {
+      setApiError(result.message);
+      return;
+    }
+    setPayments(Array.isArray(result.data) ? result.data : []);
+  };
+
+  const loadReceipts = async () => {
+    const result = await adminService.getReceipts({ page: 1, limit: 20 });
+    if (!result.success) {
+      setApiError(result.message);
+      return;
+    }
+    setReceipts(Array.isArray(result.data) ? result.data : []);
+  };
+
   const bootstrap = async () => {
     if (!requireAdminToken()) return;
 
@@ -132,12 +268,179 @@ export function AdminDashboard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  useEffect(() => {
+    if (activeTab === "tables" && tables.length === 0) {
+      void loadTables();
+    }
+    if (activeTab === "categories" && categories.length === 0) {
+      void loadCategories();
+    }
+    if (activeTab === "menus" && menus.length === 0) {
+      void loadMenus();
+      if (categories.length === 0) {
+        void loadCategories();
+      }
+    }
+    if (activeTab === "reports" && salesReport.length === 0 && topMenuReport.length === 0) {
+      void loadReports();
+    }
+    if (activeTab === "payments" && payments.length === 0) {
+      void loadPayments();
+    }
+    if (activeTab === "receipts" && receipts.length === 0) {
+      void loadReceipts();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab]);
+
   const handleRefresh = async () => {
     setIsRefreshing(true);
     clearAlerts();
     await Promise.all([loadRoles(), loadEmployees(employeeQuery), loadDashboardSummary()]);
+
+    if (activeTab === "tables") await loadTables();
+    if (activeTab === "categories") await loadCategories();
+    if (activeTab === "menus") {
+      await Promise.all([loadMenus(), loadCategories()]);
+    }
+    if (activeTab === "reports") await loadReports();
+    if (activeTab === "payments") await loadPayments();
+    if (activeTab === "receipts") await loadReceipts();
+
     setApiMessage("รีเฟรชข้อมูลสำเร็จ");
     setIsRefreshing(false);
+  };
+
+  const handleCreateTable = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    clearAlerts();
+
+    const result = await adminService.createTable(tablePayload);
+    if (!result.success) {
+      setApiError(result.message);
+      return;
+    }
+
+    setApiMessage(result.message);
+    setTablePayload(initialTablePayload);
+    await loadTables();
+  };
+
+  const handleToggleTableStatus = async (table: AdminTableItem) => {
+    clearAlerts();
+
+    const nextStatus = table.tableStatus === "AVAILABLE" ? "UNAVAILABLE" : "AVAILABLE";
+    const result = await adminService.updateTableById(table.tableId, { tableStatus: nextStatus });
+
+    if (!result.success) {
+      setApiError(result.message);
+      return;
+    }
+
+    setApiMessage(result.message);
+    await loadTables();
+  };
+
+  const handleCreateCategory = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    clearAlerts();
+
+    const result = await adminService.createCategory(categoryPayload);
+    if (!result.success) {
+      setApiError(result.message);
+      return;
+    }
+
+    setApiMessage(result.message);
+    setCategoryPayload(initialCategoryPayload);
+    await loadCategories();
+  };
+
+  const handleToggleCategoryStatus = async (categoryItem: CategoryItem) => {
+    clearAlerts();
+
+    const result = await adminService.updateCategoryById(categoryItem.categoryId, {
+      categoryStatus: !Boolean(categoryItem.categoryStatus),
+    });
+
+    if (!result.success) {
+      setApiError(result.message);
+      return;
+    }
+
+    setApiMessage(result.message);
+    await loadCategories();
+  };
+
+  const handleCreateMenu = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    clearAlerts();
+
+    const result = await adminService.createMenu(menuPayload);
+    if (!result.success) {
+      setApiError(result.message);
+      return;
+    }
+
+    setApiMessage(result.message);
+    setMenuPayload((prev) => ({ ...initialMenuPayload, categoryId: prev.categoryId }));
+    await loadMenus();
+  };
+
+  const handleToggleMenuStatus = async (menuItem: MenuItem) => {
+    clearAlerts();
+
+    const result = await adminService.updateMenuById(menuItem.menuId, {
+      menuStatus: !Boolean(menuItem.menuStatus),
+    });
+
+    if (!result.success) {
+      setApiError(result.message);
+      return;
+    }
+
+    setApiMessage(result.message);
+    await loadMenus();
+  };
+
+  const handleLookupPayment = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    clearAlerts();
+
+    const paymentId = Number(paymentLookupId);
+    if (!paymentId) {
+      setApiError("กรุณากรอก paymentId ให้ถูกต้อง");
+      return;
+    }
+
+    const result = await adminService.getPaymentById(paymentId);
+    if (!result.success || !result.data) {
+      setApiError(result.message);
+      return;
+    }
+
+    setPaymentDetail(result.data);
+    setApiMessage(result.message);
+  };
+
+  const handleLookupReceipt = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    clearAlerts();
+
+    const receiptId = Number(receiptLookupId);
+    if (!receiptId) {
+      setApiError("กรุณากรอก receiptId ให้ถูกต้อง");
+      return;
+    }
+
+    const result = await adminService.getReceiptById(receiptId);
+    if (!result.success || !result.data) {
+      setApiError(result.message);
+      return;
+    }
+
+    setReceiptDetail(result.data);
+    setApiMessage(result.message);
   };
 
   const handleSearchSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -515,6 +818,354 @@ export function AdminDashboard() {
                     เปิด Popup
                   </button>
                 </form>
+              </div>
+            ) : null}
+
+            {activeTab === "tables" ? (
+              <div className="space-y-4">
+                <form onSubmit={handleCreateTable} className="grid gap-3 rounded-3xl border border-black/8 bg-white p-4 shadow-[0_12px_30px_rgba(15,23,42,0.05)] md:grid-cols-4">
+                  <div>
+                    <label className="mb-1 block text-xs text-black/70">Table Number</label>
+                    <input
+                      value={tablePayload.tableNumber}
+                      onChange={(event) => setTablePayload((prev) => ({ ...prev, tableNumber: event.target.value }))}
+                      required
+                      className="w-full rounded-xl border border-black/10 px-3 py-2 text-sm outline-none focus:border-red-400"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs text-black/70">Capacity</label>
+                    <input
+                      type="number"
+                      min={1}
+                      value={tablePayload.capacity}
+                      onChange={(event) => setTablePayload((prev) => ({ ...prev, capacity: Number(event.target.value) }))}
+                      required
+                      className="w-full rounded-xl border border-black/10 px-3 py-2 text-sm outline-none focus:border-red-400"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs text-black/70">Status</label>
+                    <select
+                      value={tablePayload.tableStatus}
+                      onChange={(event) => setTablePayload((prev) => ({ ...prev, tableStatus: event.target.value }))}
+                      className="w-full rounded-xl border border-black/10 px-3 py-2 text-sm outline-none focus:border-red-400"
+                    >
+                      <option value="AVAILABLE">AVAILABLE</option>
+                      <option value="UNAVAILABLE">UNAVAILABLE</option>
+                      <option value="RESERVED">RESERVED</option>
+                      <option value="OCCUPIED">OCCUPIED</option>
+                    </select>
+                  </div>
+                  <div className="flex items-end">
+                    <button type="submit" className="w-full rounded-xl bg-red-800 px-3 py-2 text-sm font-semibold text-white hover:bg-red-900">
+                      เพิ่มโต๊ะ
+                    </button>
+                  </div>
+                </form>
+
+                <div className="overflow-x-auto rounded-3xl border border-black/8 bg-white shadow-[0_12px_30px_rgba(15,23,42,0.06)]">
+                  <table className="min-w-full text-sm">
+                    <thead className="bg-[#fcf4f1] text-left text-black/70">
+                      <tr>
+                        <th className="px-4 py-3">Table</th>
+                        <th className="px-4 py-3">Capacity</th>
+                        <th className="px-4 py-3">Status</th>
+                        <th className="px-4 py-3 text-center">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {tables.map((table) => (
+                        <tr key={table.tableId} className="border-t border-black/8">
+                          <td className="px-4 py-3 font-semibold">{table.tableNumber}</td>
+                          <td className="px-4 py-3">{table.capacity}</td>
+                          <td className="px-4 py-3">{table.tableStatus}</td>
+                          <td className="px-4 py-3 text-center">
+                            <button
+                              onClick={() => void handleToggleTableStatus(table)}
+                              className="rounded-lg border border-black/15 px-3 py-1 text-xs font-semibold hover:bg-black/5"
+                            >
+                              Toggle
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ) : null}
+
+            {activeTab === "categories" ? (
+              <div className="space-y-4">
+                <form onSubmit={handleCreateCategory} className="grid gap-3 rounded-3xl border border-black/8 bg-white p-4 shadow-[0_12px_30px_rgba(15,23,42,0.05)] md:grid-cols-4">
+                  <div>
+                    <label className="mb-1 block text-xs text-black/70">Category Name</label>
+                    <input
+                      value={categoryPayload.categoryName}
+                      onChange={(event) => setCategoryPayload((prev) => ({ ...prev, categoryName: event.target.value }))}
+                      required
+                      className="w-full rounded-xl border border-black/10 px-3 py-2 text-sm outline-none focus:border-red-400"
+                    />
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className="mb-1 block text-xs text-black/70">Description</label>
+                    <input
+                      value={categoryPayload.description ?? ""}
+                      onChange={(event) => setCategoryPayload((prev) => ({ ...prev, description: event.target.value }))}
+                      className="w-full rounded-xl border border-black/10 px-3 py-2 text-sm outline-none focus:border-red-400"
+                    />
+                  </div>
+                  <div className="flex items-end">
+                    <button type="submit" className="w-full rounded-xl bg-red-800 px-3 py-2 text-sm font-semibold text-white hover:bg-red-900">
+                      เพิ่มหมวดหมู่
+                    </button>
+                  </div>
+                </form>
+
+                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                  {categories.map((categoryItem) => (
+                    <article key={categoryItem.categoryId} className="rounded-2xl border border-black/10 bg-white p-4">
+                      <p className="text-xs text-black/60">#{categoryItem.categoryId}</p>
+                      <h4 className="mt-2 text-base font-semibold">{categoryItem.categoryName}</h4>
+                      <p className="mt-1 text-xs text-black/60">{categoryItem.description || "-"}</p>
+                      <div className="mt-3 flex items-center justify-between">
+                        <span className={`rounded-full px-2 py-1 text-xs ${categoryItem.categoryStatus ? "bg-emerald-100 text-emerald-700" : "bg-zinc-200 text-zinc-700"}`}>
+                          {categoryItem.categoryStatus ? "Active" : "Inactive"}
+                        </span>
+                        <button
+                          onClick={() => void handleToggleCategoryStatus(categoryItem)}
+                          className="rounded-lg border border-black/15 px-3 py-1 text-xs font-semibold hover:bg-black/5"
+                        >
+                          Toggle
+                        </button>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+
+            {activeTab === "menus" ? (
+              <div className="space-y-4">
+                <form onSubmit={handleCreateMenu} className="grid gap-3 rounded-3xl border border-black/8 bg-white p-4 shadow-[0_12px_30px_rgba(15,23,42,0.05)] md:grid-cols-6">
+                  <div className="md:col-span-2">
+                    <label className="mb-1 block text-xs text-black/70">Menu Name</label>
+                    <input
+                      value={menuPayload.menuName}
+                      onChange={(event) => setMenuPayload((prev) => ({ ...prev, menuName: event.target.value }))}
+                      required
+                      className="w-full rounded-xl border border-black/10 px-3 py-2 text-sm outline-none focus:border-red-400"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs text-black/70">Price</label>
+                    <input
+                      type="number"
+                      min={0}
+                      step="0.01"
+                      value={menuPayload.price}
+                      onChange={(event) => setMenuPayload((prev) => ({ ...prev, price: Number(event.target.value) }))}
+                      required
+                      className="w-full rounded-xl border border-black/10 px-3 py-2 text-sm outline-none focus:border-red-400"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs text-black/70">Category</label>
+                    <select
+                      value={menuPayload.categoryId}
+                      onChange={(event) => setMenuPayload((prev) => ({ ...prev, categoryId: Number(event.target.value) }))}
+                      className="w-full rounded-xl border border-black/10 px-3 py-2 text-sm outline-none focus:border-red-400"
+                    >
+                      {categories.map((categoryItem) => (
+                        <option key={categoryItem.categoryId} value={categoryItem.categoryId}>
+                          {categoryItem.categoryName}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className="mb-1 block text-xs text-black/70">Image URL</label>
+                    <input
+                      value={menuPayload.imageUrl ?? ""}
+                      onChange={(event) => setMenuPayload((prev) => ({ ...prev, imageUrl: event.target.value }))}
+                      className="w-full rounded-xl border border-black/10 px-3 py-2 text-sm outline-none focus:border-red-400"
+                    />
+                  </div>
+                  <div className="md:col-span-5">
+                    <label className="mb-1 block text-xs text-black/70">Description</label>
+                    <input
+                      value={menuPayload.description ?? ""}
+                      onChange={(event) => setMenuPayload((prev) => ({ ...prev, description: event.target.value }))}
+                      className="w-full rounded-xl border border-black/10 px-3 py-2 text-sm outline-none focus:border-red-400"
+                    />
+                  </div>
+                  <div className="flex items-end">
+                    <button type="submit" className="w-full rounded-xl bg-red-800 px-3 py-2 text-sm font-semibold text-white hover:bg-red-900">
+                      เพิ่มเมนู
+                    </button>
+                  </div>
+                </form>
+
+                <div className="overflow-x-auto rounded-3xl border border-black/8 bg-white shadow-[0_12px_30px_rgba(15,23,42,0.06)]">
+                  <table className="min-w-full text-sm">
+                    <thead className="bg-[#fcf4f1] text-left text-black/70">
+                      <tr>
+                        <th className="px-4 py-3">Menu</th>
+                        <th className="px-4 py-3">Category</th>
+                        <th className="px-4 py-3">Price</th>
+                        <th className="px-4 py-3">Status</th>
+                        <th className="px-4 py-3 text-center">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {menus.map((menuItem) => (
+                        <tr key={menuItem.menuId} className="border-t border-black/8">
+                          <td className="px-4 py-3 font-medium">{menuItem.menuName}</td>
+                          <td className="px-4 py-3">{menuItem.categoryName ?? menuItem.categoryId}</td>
+                          <td className="px-4 py-3">{menuItem.price.toFixed(2)}</td>
+                          <td className="px-4 py-3">{menuItem.menuStatus ? "Active" : "Inactive"}</td>
+                          <td className="px-4 py-3 text-center">
+                            <button
+                              onClick={() => void handleToggleMenuStatus(menuItem)}
+                              className="rounded-lg border border-black/15 px-3 py-1 text-xs font-semibold hover:bg-black/5"
+                            >
+                              Toggle
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ) : null}
+
+            {activeTab === "reports" ? (
+              <div className="space-y-4">
+                <div className="grid gap-4 md:grid-cols-2">
+                  <section className="rounded-3xl border border-black/8 bg-white p-4">
+                    <h3 className="text-base font-semibold">Sales Report</h3>
+                    <div className="mt-3 space-y-2">
+                      {salesReport.map((row) => (
+                        <div key={row.date} className="flex items-center justify-between rounded-xl bg-black/3 px-3 py-2 text-sm">
+                          <span>{row.date}</span>
+                          <span className="font-semibold">{row.totalSales.toFixed(2)} ฿</span>
+                        </div>
+                      ))}
+                    </div>
+                  </section>
+
+                  <section className="rounded-3xl border border-black/8 bg-white p-4">
+                    <h3 className="text-base font-semibold">Top Menus</h3>
+                    <div className="mt-3 space-y-2">
+                      {topMenuReport.map((row) => (
+                        <div key={row.menuId} className="flex items-center justify-between rounded-xl bg-black/3 px-3 py-2 text-sm">
+                          <span>{row.menuName}</span>
+                          <span className="font-semibold">{row.totalSold}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </section>
+                </div>
+              </div>
+            ) : null}
+
+            {activeTab === "payments" ? (
+              <div className="space-y-4">
+                <form onSubmit={handleLookupPayment} className="grid gap-3 rounded-3xl border border-black/8 bg-white p-4 shadow-[0_12px_30px_rgba(15,23,42,0.05)] sm:grid-cols-[1fr_auto]">
+                  <input
+                    value={paymentLookupId}
+                    onChange={(event) => setPaymentLookupId(event.target.value)}
+                    placeholder="ค้นหา paymentId"
+                    className="rounded-xl border border-black/10 px-3 py-2 text-sm outline-none focus:border-red-400"
+                  />
+                  <button type="submit" className="rounded-xl bg-red-800 px-4 py-2 text-sm font-semibold text-white hover:bg-red-900">
+                    ค้นหา
+                  </button>
+                </form>
+
+                {paymentDetail ? (
+                  <article className="rounded-2xl border border-black/10 bg-white p-4 text-sm">
+                    <p className="text-xs text-black/55">Payment Detail</p>
+                    <p className="mt-1 font-semibold">#{paymentDetail.paymentId}</p>
+                    <p className="mt-1">Session: {paymentDetail.sessionId}</p>
+                    <p>Paid: {paymentDetail.paidAmount.toFixed(2)} ฿</p>
+                    <p>Change: {paymentDetail.changeAmount.toFixed(2)} ฿</p>
+                  </article>
+                ) : null}
+
+                <div className="overflow-x-auto rounded-3xl border border-black/8 bg-white shadow-[0_12px_30px_rgba(15,23,42,0.06)]">
+                  <table className="min-w-full text-sm">
+                    <thead className="bg-[#fcf4f1] text-left text-black/70">
+                      <tr>
+                        <th className="px-4 py-3">Payment ID</th>
+                        <th className="px-4 py-3">Session</th>
+                        <th className="px-4 py-3">Method</th>
+                        <th className="px-4 py-3">Paid</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {payments.map((payment) => (
+                        <tr key={payment.paymentId} className="border-t border-black/8">
+                          <td className="px-4 py-3">{payment.paymentId}</td>
+                          <td className="px-4 py-3">{payment.sessionId}</td>
+                          <td className="px-4 py-3">{payment.paymentMethodName ?? "-"}</td>
+                          <td className="px-4 py-3">{payment.paidAmount.toFixed(2)} ฿</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ) : null}
+
+            {activeTab === "receipts" ? (
+              <div className="space-y-4">
+                <form onSubmit={handleLookupReceipt} className="grid gap-3 rounded-3xl border border-black/8 bg-white p-4 shadow-[0_12px_30px_rgba(15,23,42,0.05)] sm:grid-cols-[1fr_auto]">
+                  <input
+                    value={receiptLookupId}
+                    onChange={(event) => setReceiptLookupId(event.target.value)}
+                    placeholder="ค้นหา receiptId"
+                    className="rounded-xl border border-black/10 px-3 py-2 text-sm outline-none focus:border-red-400"
+                  />
+                  <button type="submit" className="rounded-xl bg-red-800 px-4 py-2 text-sm font-semibold text-white hover:bg-red-900">
+                    ค้นหา
+                  </button>
+                </form>
+
+                {receiptDetail ? (
+                  <article className="rounded-2xl border border-black/10 bg-white p-4 text-sm">
+                    <p className="text-xs text-black/55">Receipt Detail</p>
+                    <p className="mt-1 font-semibold">{receiptDetail.receiptNumber}</p>
+                    <p className="mt-1">Receipt ID: {receiptDetail.receiptId}</p>
+                    <p>Payment: {receiptDetail.paymentId}</p>
+                    <p>Total: {receiptDetail.totalAmount.toFixed(2)} ฿</p>
+                  </article>
+                ) : null}
+
+                <div className="overflow-x-auto rounded-3xl border border-black/8 bg-white shadow-[0_12px_30px_rgba(15,23,42,0.06)]">
+                  <table className="min-w-full text-sm">
+                    <thead className="bg-[#fcf4f1] text-left text-black/70">
+                      <tr>
+                        <th className="px-4 py-3">Receipt No.</th>
+                        <th className="px-4 py-3">Receipt ID</th>
+                        <th className="px-4 py-3">Payment</th>
+                        <th className="px-4 py-3">Total</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {receipts.map((receipt) => (
+                        <tr key={receipt.receiptId} className="border-t border-black/8">
+                          <td className="px-4 py-3">{receipt.receiptNumber}</td>
+                          <td className="px-4 py-3">{receipt.receiptId}</td>
+                          <td className="px-4 py-3">{receipt.paymentId}</td>
+                          <td className="px-4 py-3">{receipt.totalAmount.toFixed(2)} ฿</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             ) : null}
           </section>

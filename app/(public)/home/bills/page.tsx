@@ -1,23 +1,65 @@
 // app/(public-session)/bills/page.tsx
 "use client";
 
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { BillItemCard } from "@/components/public-section/bills/bill-item-card";
 import type { OrderBillItem } from "@/components/public-section/public-section.types";
-
-// Mock bill data — in a real app this would come from an API
-const MOCK_BILLS: OrderBillItem[] = [
-  {
-    id: "bill-1",
-    name: "กะเพรา (หมูสับ / ไก่ / หมูกรอบ / ทะเล) ราดข้าว",
-    options: ["หมูสับ"],
-    price: 50,
-    status: "preparing",
-  },
-];
+import { publicService } from "@/services/public.service";
+import { publicSession } from "@/services/publicSession";
 
 export default function BillsPage() {
   const router = useRouter();
+  const [items, setItems] = useState<OrderBillItem[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    const loadOrderStatus = async () => {
+      const qrToken = publicSession.getQrToken();
+      if (!qrToken) {
+        setErrorMessage("ไม่พบ qrToken กรุณาสแกน QR ใหม่อีกครั้ง");
+        setIsLoading(false);
+        return;
+      }
+
+      const response = await publicService.getCustomerOrderStatus(qrToken);
+      if (!response.success || !response.data) {
+        setErrorMessage(response.message);
+        setIsLoading(false);
+        return;
+      }
+
+      const nextItems = response.data.orders.flatMap((order) =>
+        order.items.map((item) => {
+          const normalizedStatus: OrderBillItem["status"] =
+            item.itemStatus.toUpperCase() === "PREPARING"
+              ? "preparing"
+              : item.itemStatus.toUpperCase() === "READY"
+                ? "ready"
+                : "served";
+
+          return {
+            id: `${order.orderId}-${item.orderItemId}`,
+            name: item.menuName,
+            options: [],
+            price: item.unitPrice * item.quantity,
+            status: normalizedStatus,
+          };
+        })
+      );
+
+      setItems(nextItems);
+      setIsLoading(false);
+    };
+
+    void loadOrderStatus();
+  }, []);
+
+  const emptyLabel = useMemo(() => {
+    if (isLoading) return "กำลังโหลดรายการสั่งอาหาร";
+    return "ยังไม่มีรายการสั่งอาหาร";
+  }, [isLoading]);
 
   return (
     <main className="flex min-h-screen flex-col bg-white">
@@ -39,12 +81,18 @@ export default function BillsPage() {
 
       {/* Bill items */}
       <div className="flex-1 px-4 py-4 space-y-3">
-        {MOCK_BILLS.length === 0 ? (
+        {errorMessage ? (
+          <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            {errorMessage}
+          </div>
+        ) : null}
+
+        {items.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 text-center">
-            <p className="text-gray-400 text-sm">ยังไม่มีรายการสั่งอาหาร</p>
+            <p className="text-gray-400 text-sm">{emptyLabel}</p>
           </div>
         ) : (
-          MOCK_BILLS.map((bill) => (
+          items.map((bill) => (
             <BillItemCard key={bill.id} item={bill} />
           ))
         )}

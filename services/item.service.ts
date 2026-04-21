@@ -1,34 +1,38 @@
-// services/item.service.ts
-import { MenuItem } from "@/components/public-section/public-section.types";
+import type { Category, MenuItem } from "@/components/public-section/public-section.types";
+import { publicService } from "./public.service";
 
-/**
- * Service to handle menu item data fetching with search and filter support.
- */
 export const itemService = {
-  /**
-   * Fetches menu items based on search keyword and category.
-   * @param search - Search keyword
-   * @param category - Category ID
-   * @returns List of menu items
-   */
-  async getItems(search?: string, category?: string): Promise<MenuItem[]> {
-    const params = new URLSearchParams();
-    if (search) params.append("search", search);
-    if (category && category !== "all") params.append("category", category);
-
-    const queryString = params.toString();
-    const url = `/api/items${queryString ? `?${queryString}` : ""}`;
-
-    try {
-      const response = await fetch(url);
-      if (!response.ok) {
-        throw new Error(`Failed to fetch items: ${response.statusText}`);
-      }
-      return await response.json();
-    } catch (error) {
-      console.error("Error fetching items:", error);
-      // For now, return empty or handle appropriately
-      throw error;
+  async getMenuBundle(qrToken: string): Promise<{
+    tableNumber: string;
+    categories: Category[];
+    items: MenuItem[];
+  }> {
+    const response = await publicService.getCustomerMenus(qrToken);
+    if (!response.success || !response.data) {
+      throw new Error(response.message);
     }
+
+    return {
+      tableNumber: response.data.table.tableNumber,
+      categories: [
+        { id: "all", label: "เมนูทั้งหมด" },
+        ...response.data.categories.map((category) => ({
+          id: String(category.categoryId),
+          label: category.categoryName,
+          categoryId: category.categoryId,
+          description: category.description,
+        })),
+      ],
+      items: response.data.menus.map((item) => ({
+        id: String(item.menuId),
+        menuId: item.menuId,
+        name: item.menuName,
+        price: item.price,
+        imageUrl: item.imageUrl ?? "/public-section/food-kaphrao.jpg",
+        categoryId: item.categoryId ? String(item.categoryId) : "uncategorized",
+        categoryName: item.categoryName,
+        description: item.description,
+      })),
+    };
   },
 };

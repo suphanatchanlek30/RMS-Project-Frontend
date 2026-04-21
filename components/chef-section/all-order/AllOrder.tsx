@@ -1,10 +1,21 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Search, LogOut, ChevronDown } from 'lucide-react';
 import OrderCard, { OrderItemProps } from './OrderCard';
+import { chefService } from '@/services/chef.service';
+import { authSession } from '@/services/authSession';
 
-const TabButton = ({ active, onClick, label, count, countColor = "bg-gray-200 text-gray-800", activeColor = "bg-red-600 text-white" }: any) => {
+interface TabButtonProps {
+  active: boolean;
+  onClick: () => void;
+  label: string;
+  count: number;
+  countColor?: string;
+  activeColor?: string;
+}
+
+const TabButton = ({ active, onClick, label, count, countColor = "bg-gray-200 text-gray-800", activeColor = "bg-red-600 text-white" }: TabButtonProps) => {
   return (
     <button
       onClick={onClick}
@@ -13,7 +24,7 @@ const TabButton = ({ active, onClick, label, count, countColor = "bg-gray-200 te
     >
       <span className="font-semibold text-sm">{label}</span>
       {count > 0 && (
-        <span className={`flex items-center justify-center min-w-[20px] h-[20px] rounded-full text-xs font-bold px-1.5
+        <span className={`flex items-center justify-center min-w-5 h-5 rounded-full text-xs font-bold px-1.5
           ${active && activeColor.includes('red') ? 'bg-white text-red-600' : countColor + (countColor.includes('yellow') ? ' text-gray-800' : ' text-white')}`}>
           {count}
         </span>
@@ -23,8 +34,33 @@ const TabButton = ({ active, onClick, label, count, countColor = "bg-gray-200 te
 };
 
 
-export default function AllOrder({ orders = [] }: { orders?: OrderItemProps[] }) {
+export default function AllOrder() {
   const [activeTab, setActiveTab] = useState('All Order');
+  const [orders, setOrders] = useState<OrderItemProps[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    const loadOrders = async () => {
+      setIsLoading(true);
+      setErrorMessage(null);
+
+      const response = await chefService.getKitchenOrders();
+      if (!response.success || !response.data) {
+        setErrorMessage(response.message);
+        setOrders([]);
+        setIsLoading(false);
+        return;
+      }
+
+      setOrders(response.data);
+      setIsLoading(false);
+    };
+
+    void loadOrders();
+  }, []);
+
+  const employeeName = useMemo(() => authSession.getEmployeeProfile()?.employeeName ?? 'Chef', []);
 
   const newOrdersCount = orders.filter(o => o.status === 'new').length;
   const preparingCount = orders.filter(o => o.status === 'preparing').length;
@@ -51,7 +87,7 @@ export default function AllOrder({ orders = [] }: { orders?: OrderItemProps[] })
           
           <div className="flex items-center justify-between px-6 py-5 relative z-10">
             <div className="bg-white rounded-md px-8 py-2.5 shadow-sm">
-              <span className="font-bold text-gray-800">นาย XXX XXX</span>
+              <span className="font-bold text-gray-800">{employeeName}</span>
             </div>
             
             <div className="flex items-center gap-6 text-white mr-2">
@@ -77,7 +113,7 @@ export default function AllOrder({ orders = [] }: { orders?: OrderItemProps[] })
               <TabButton active={activeTab === 'History'} onClick={() => setActiveTab('History')} label="History" count={historyCount} />
             </div>
             
-            <div className="flex flex-shrink-0 items-center bg-white border border-gray-200 rounded-full px-5 py-2 cursor-pointer shadow-sm hover:bg-gray-50 transition-colors shadow-sm">
+            <div className="flex shrink-0 items-center bg-white border border-gray-200 rounded-full px-5 py-2 cursor-pointer shadow-sm hover:bg-gray-50 transition-colors">
               <span className="text-sm font-semibold mr-2 text-gray-800">Lastest Order</span>
               <ChevronDown size={18} className="text-gray-600" />
             </div>
@@ -85,7 +121,17 @@ export default function AllOrder({ orders = [] }: { orders?: OrderItemProps[] })
 
           {/* Grid Layout Container */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8 bg-white">
-            {filteredOrders.length > 0 ? (
+            {errorMessage ? (
+              <div className="col-span-full rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                {errorMessage}
+              </div>
+            ) : null}
+
+            {isLoading ? (
+              Array.from({ length: 6 }, (_, index) => (
+                <div key={index} className="h-72 animate-pulse rounded-2xl bg-gray-100" />
+              ))
+            ) : filteredOrders.length > 0 ? (
               filteredOrders.map((order) => (
                 <OrderCard key={order.id} {...order} />
               ))

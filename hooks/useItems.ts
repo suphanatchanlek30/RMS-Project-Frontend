@@ -1,25 +1,24 @@
 // hooks/useItems.ts
 import { useState, useEffect, useCallback } from "react";
-import { MenuItem } from "@/components/public-section/public-section.types";
+import type { ActiveTableInfo, Category, MenuItem } from "@/components/public-section/public-section.types";
 import { itemService } from "@/services/item.service";
-import { MENU_ITEMS } from "@/lib/constants/public-session.constants";
+import { publicService } from "@/services/public.service";
+import { publicSession } from "@/services/publicSession";
 
-/**
- * Custom hook to manage menu items fetching, searching, and filtering.
- */
 export function useItems() {
   const [items, setItems] = useState<MenuItem[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [tableInfo, setTableInfo] = useState<ActiveTableInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("all");
   const [debouncedSearch, setDebouncedSearch] = useState("");
 
-  // Debounce search input
   useEffect(() => {
     const handler = setTimeout(() => {
       setDebouncedSearch(search);
-    }, 500); // 500ms debounce
+    }, 300);
 
     return () => {
       clearTimeout(handler);
@@ -29,32 +28,51 @@ export function useItems() {
   const fetchItems = useCallback(async () => {
     setLoading(true);
     setError(null);
+
+    const qrToken = publicSession.getQrToken();
+    if (!qrToken) {
+      setError("ไม่พบ qrToken กรุณาสแกน QR ใหม่อีกครั้ง");
+      setItems([]);
+      setCategories([]);
+      setLoading(false);
+      return;
+    }
+
+    const verifyResult = await publicService.verifyQrToken(qrToken);
+    if (!verifyResult.success || !verifyResult.data) {
+      setError(verifyResult.message);
+      publicSession.clearAll();
+      setItems([]);
+      setCategories([]);
+      setLoading(false);
+      return;
+    }
+
+    publicSession.setVerifiedQrSession(verifyResult.data);
+
     try {
-      // In a real scenario, this calls the API
-      // For this demonstration, if the API fails (like now), we can fallback to mock logic
-      // but we implement the true API call as requested.
-      
-      try {
-        const data = await itemService.getItems(debouncedSearch, category);
-        setItems(data);
-      } catch (err) {
-        console.warn("API not available, falling back to mock filtering logic.", err);
-        
-        // Mock filtering logic to keep the UI functional during development
-        let filtered = [...MENU_ITEMS];
-        if (debouncedSearch) {
-          filtered = filtered.filter((item) =>
-            item.name.toLowerCase().includes(debouncedSearch.toLowerCase())
-          );
-        }
-        if (category && category !== "all") {
-          filtered = filtered.filter((item) => item.categoryId === category);
-        }
-        setItems(filtered);
+      const bundle = await itemService.getMenuBundle(qrToken);
+      publicSession.setMenuBundle(bundle);
+      setTableInfo({
+        tableId: verifyResult.data.tableId,
+        tableNumber: bundle.tableNumber,
+      });
+      setCategories(bundle.categories);
+
+      let filtered = [...bundle.items];
+      if (debouncedSearch) {
+        filtered = filtered.filter((item) =>
+          item.name.toLowerCase().includes(debouncedSearch.toLowerCase())
+        );
       }
+      if (category && category !== "all") {
+        filtered = filtered.filter((item) => item.categoryId === category);
+      }
+      setItems(filtered);
     } catch (err) {
-      setError("เกิดข้อผิดพลาดในการดึงข้อมูลเมนู");
-      console.error(err);
+      setError(err instanceof Error ? err.message : "เกิดข้อผิดพลาดในการดึงข้อมูลเมนู");
+      setItems([]);
+      setCategories([]);
     } finally {
       setLoading(false);
     }
@@ -66,6 +84,8 @@ export function useItems() {
 
   return {
     items,
+    categories,
+    tableInfo,
     loading,
     error,
     search,

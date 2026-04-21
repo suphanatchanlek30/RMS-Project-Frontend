@@ -1,13 +1,15 @@
 // app/(public-session)/menu/[id]/page.tsx
 "use client";
 
-import { useState, use } from "react";
+import { useEffect, useMemo, useState, use } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { OptionInputField } from "@/components/public-section/menu-detail";
 import { QuantityInputField } from "@/components/public-section/menu-detail";
 import { useCart } from "@/components/public-section/cart-context";
-import { MENU_ITEMS } from "@/lib/constants/public-session.constants";
+import type { MenuItem } from "@/components/public-section/public-section.types";
+import { itemService } from "@/services/item.service";
+import { publicSession } from "@/services/publicSession";
 
 interface MenuDetailPageProps {
   params: Promise<{ id: string }>;
@@ -17,14 +19,62 @@ export default function MenuDetailPage({ params }: MenuDetailPageProps) {
   const { id } = use(params);
   const router = useRouter();
   const { addItem } = useCart();
+  const [item, setItem] = useState<MenuItem | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const item = MENU_ITEMS.find((m) => m.id === id);
+  useEffect(() => {
+    const loadItem = async () => {
+      setIsLoading(true);
 
-  const [selectedOptions, setSelectedOptions] = useState<string[]>(
-    item?.options?.[0] ? [item.options[0].id] : []
+      const cachedBundle = publicSession.getMenuBundle();
+      const cachedItem = cachedBundle?.items.find((menuItem) => menuItem.id === id) ?? null;
+      if (cachedItem) {
+        setItem(cachedItem);
+        setIsLoading(false);
+        return;
+      }
+
+      const qrToken = publicSession.getQrToken();
+      if (!qrToken) {
+        setItem(null);
+        setIsLoading(false);
+        return;
+      }
+
+      try {
+        const bundle = await itemService.getMenuBundle(qrToken);
+        publicSession.setMenuBundle(bundle);
+        setItem(bundle.items.find((menuItem) => menuItem.id === id) ?? null);
+      } catch {
+        setItem(null);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    void loadItem();
+  }, [id]);
+
+  const defaultSelectedOptions = useMemo(
+    () => (item?.options?.[0] ? [item.options[0].id] : []),
+    [item]
   );
+
+  const [selectedOptions, setSelectedOptions] = useState<string[]>([]);
   const [note, setNote] = useState("");
   const [quantity, setQuantity] = useState(1);
+
+  useEffect(() => {
+    setSelectedOptions(defaultSelectedOptions);
+  }, [defaultSelectedOptions]);
+
+  if (isLoading) {
+    return (
+      <main className="flex min-h-screen flex-col items-center justify-center bg-white p-8">
+        <p className="text-gray-500">กำลังโหลดเมนู...</p>
+      </main>
+    );
+  }
 
   if (!item) {
     return (

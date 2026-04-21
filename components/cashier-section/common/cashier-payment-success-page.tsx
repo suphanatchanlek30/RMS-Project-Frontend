@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { cashierFlowStorage, type StoredCheckoutRecord } from "@/services/cashierFlowStorage";
+import { cashierService, type PaymentDetail, type ReceiptDetail } from "@/services/cashier.service";
 import CashierHeader from "../common/cashier-header";
 
 export default function CashierPaymentSuccessPage({
@@ -11,11 +12,33 @@ export default function CashierPaymentSuccessPage({
   tableId: string;
 }) {
   const router = useRouter();
-  const [checkoutRecord, setCheckoutRecord] = useState<StoredCheckoutRecord | null>(null);
+  const checkoutRecord = useMemo<StoredCheckoutRecord | null>(
+    () => cashierFlowStorage.getCheckoutRecord(Number(tableId)),
+    [tableId]
+  );
+  const [paymentDetail, setPaymentDetail] = useState<PaymentDetail | null>(null);
+  const [receiptDetail, setReceiptDetail] = useState<ReceiptDetail | null>(null);
 
   useEffect(() => {
-    setCheckoutRecord(cashierFlowStorage.getCheckoutRecord(Number(tableId)));
-  }, [tableId]);
+    const loadDetails = async () => {
+      if (!checkoutRecord) return;
+
+      const [paymentResponse, receiptResponse] = await Promise.all([
+        cashierService.getPaymentById(checkoutRecord.paymentId),
+        cashierService.getReceiptById(checkoutRecord.receiptId),
+      ]);
+
+      if (paymentResponse.success && paymentResponse.data) {
+        setPaymentDetail(paymentResponse.data);
+      }
+
+      if (receiptResponse.success && receiptResponse.data) {
+        setReceiptDetail(receiptResponse.data);
+      }
+    };
+
+    void loadDetails();
+  }, [checkoutRecord]);
 
   const handlePrint = () => {
     window.print();
@@ -59,15 +82,23 @@ export default function CashierPaymentSuccessPage({
           <div className="mt-6 rounded-2xl bg-white px-5 py-4 text-sm text-black shadow-sm">
             <div className="flex items-center justify-between gap-4">
               <span className="text-black/55">Receipt No.</span>
-              <span className="font-bold">{checkoutRecord?.receiptNumber ?? "-"}</span>
+              <span className="font-bold">{receiptDetail?.receiptNumber ?? checkoutRecord?.receiptNumber ?? "-"}</span>
             </div>
             <div className="mt-3 flex items-center justify-between gap-4">
               <span className="text-black/55">Payment ID</span>
-              <span className="font-bold">{checkoutRecord?.paymentId ?? "-"}</span>
+              <span className="font-bold">{paymentDetail?.paymentId ?? checkoutRecord?.paymentId ?? "-"}</span>
+            </div>
+            <div className="mt-3 flex items-center justify-between gap-4">
+              <span className="text-black/55">Paid Amount</span>
+              <span className="font-bold">{paymentDetail ? `${paymentDetail.paidAmount.toFixed(2)} ฿` : "-"}</span>
             </div>
             <div className="mt-3 flex items-center justify-between gap-4">
               <span className="text-black/55">Change</span>
-              <span className="font-bold">{checkoutRecord ? `${checkoutRecord.changeAmount.toFixed(2)} ฿` : "-"}</span>
+              <span className="font-bold">{paymentDetail ? `${paymentDetail.changeAmount.toFixed(2)} ฿` : checkoutRecord ? `${checkoutRecord.changeAmount.toFixed(2)} ฿` : "-"}</span>
+            </div>
+            <div className="mt-3 flex items-center justify-between gap-4">
+              <span className="text-black/55">Receipt Total</span>
+              <span className="font-bold">{receiptDetail ? `${receiptDetail.totalAmount.toFixed(2)} ฿` : "-"}</span>
             </div>
             <div className="mt-3 flex items-center justify-between gap-4">
               <span className="text-black/55">Table Status</span>

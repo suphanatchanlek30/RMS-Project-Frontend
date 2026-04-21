@@ -1,10 +1,13 @@
 // components/public-section/order-success/order-success-view.tsx
 "use client";
 
+import { useMemo } from "react";
 import { useRouter } from "next/navigation";
+import { publicOrderStorage } from "../../../services/publicOrderStorage";
 
 export function OrderSuccessView() {
   const router = useRouter();
+  const latestOrder = useMemo(() => publicOrderStorage.getLastOrder(), []);
 
   return (
     <div className="flex flex-col items-center gap-6 text-center">
@@ -28,7 +31,12 @@ export function OrderSuccessView() {
       </div>
 
       <div className="flex flex-col gap-4">
-        <p className="text-xl font-semibold text-gray-800">Must be the orders</p>
+        <div className="space-y-1">
+          <p className="text-xl font-semibold text-gray-800">ส่งออเดอร์เรียบร้อยแล้ว</p>
+          <p className="text-sm text-gray-500">
+            {latestOrder ? `Order #${latestOrder.orderId} ถูกส่งเข้าครัวแล้ว` : "ระบบได้รับรายการของคุณแล้ว"}
+          </p>
+        </div>
         <button
           type="button"
           onClick={() => router.push("/home/menu")}

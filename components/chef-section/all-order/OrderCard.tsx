@@ -24,7 +24,7 @@ export default function OrderCard({ id, status, items }: OrderItemProps) {
         <div className={`w-3 h-3 rounded-full ${statusColor}`}></div>
       </div>
 
-      <div className="flex justify-between items-center border-b-[2px] border-gray-200 pb-2 mb-3">
+      <div className="flex justify-between items-center border-b-2 border-gray-200 pb-2 mb-3">
         <span className="text-sm font-bold text-gray-800">รายการอาหาร</span>
         <span className="text-sm font-bold text-gray-800">จำนวน</span>
       </div>
@@ -39,7 +39,7 @@ export default function OrderCard({ id, status, items }: OrderItemProps) {
       </div>
 
               <div className="mt-auto flex justify-center">
-        <Link href={`/all-order/${id.toLowerCase()}`} className="bg-black hover:bg-gray-800 text-white text-xs font-semibold px-6 py-2.5 rounded-full transition-colors w-2/3 text-center block">
+        <Link href={`/all-order/${id}`} className="bg-black hover:bg-gray-800 text-white text-xs font-semibold px-6 py-2.5 rounded-full transition-colors w-2/3 text-center block">
           ดูรายละเอียด
         </Link>
       </div>
