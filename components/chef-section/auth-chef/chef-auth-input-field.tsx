@@ -9,6 +9,9 @@ export function ChefAuthInputField({
   autoComplete,
   label,
   placeholder,
+  value,
+  disabled = false,
+  onChange,
   className,
 }: ChefAuthInputFieldProps) {
   const isPassword = type === "password";
@@ -43,7 +46,10 @@ export function ChefAuthInputField({
           type={type}
           autoComplete={autoComplete}
           placeholder={placeholder}
-          className="h-11 w-full rounded-lg border border-white/5 bg-black/85 pl-9 pr-3 text-sm text-white placeholder:text-[#7a7d80] outline-none transition-[border-color,box-shadow,background-color] duration-200 ease-in focus:border-(--primary) focus:ring-4 focus:ring-(--primary-soft)"
+          value={value}
+          disabled={disabled}
+          onChange={onChange}
+          className="h-11 w-full rounded-lg border border-white/5 bg-black/85 pl-9 pr-3 text-sm text-white placeholder:text-[#7a7d80] outline-none transition-[border-color,box-shadow,background-color] duration-200 ease-in focus:border-(--primary) focus:ring-4 focus:ring-(--primary-soft) disabled:cursor-not-allowed disabled:opacity-70"
         />
       </div>
     </div>

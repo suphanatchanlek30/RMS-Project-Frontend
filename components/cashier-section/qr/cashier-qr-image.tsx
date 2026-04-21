@@ -1,14 +1,19 @@
-export default function CashierQrImage({ tableId }: { tableId: string }) {
-  
-  // mock เฉพาะโต๊ะ 3
-  const mockQrByTable: Record<string, string> = {
-    "3": "https://your-app.com/table/3",
-  };
+"use client";
 
-  const qrUrl = mockQrByTable[tableId];
+import { useMemo } from "react";
 
-  // ถ้าไม่ใช่โต๊ะ 3 → ไม่มี QR
-  if (!qrUrl) {
+export default function CashierQrImage({ qrCodeUrl, qrToken }: { qrCodeUrl?: string | null; qrToken?: string | null }) {
+  const qrPayload = useMemo(() => {
+    if (qrToken) {
+      if (typeof window === "undefined") return `/q/${qrToken}`;
+      return `${window.location.origin}/q/${qrToken}`;
+    }
+
+    if (qrCodeUrl) return qrCodeUrl;
+    return null;
+  }, [qrCodeUrl, qrToken]);
+
+  if (!qrPayload) {
     return (
       <div className="text-gray-500 text-sm">
         ไม่มี QR Code สำหรับโต๊ะนี้
@@ -19,7 +24,7 @@ export default function CashierQrImage({ tableId }: { tableId: string }) {
   return (
     <div className="bg-white p-4 rounded-lg w-fit mx-auto">
       <img
-        src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${qrUrl}`}
+        src={`https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=${encodeURIComponent(qrPayload)}`}
         alt="qr"
       />
     </div>

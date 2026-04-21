@@ -1,5 +1,5 @@
-import { CashierAuthLogin } from "@/components/cashier-section/auth-cashier";
+import { redirect } from "next/navigation";
 
 export default function Page() {
-  return <CashierAuthLogin />;
+  redirect("/auth");
 }
