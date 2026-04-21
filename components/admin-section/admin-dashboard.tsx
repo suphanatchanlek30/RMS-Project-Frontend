@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-import { adminService, type CreateEmployeePayload, type EmployeeItem, type EmployeeQueryParams, type RoleItem, type UpdateEmployeePayload } from "@/services/admin.service";
+import { adminService, type CreateEmployeePayload, type DashboardSummary, type EmployeeItem, type EmployeeQueryParams, type RoleItem, type UpdateEmployeePayload } from "@/services/admin.service";
 import { AdminSidebar, type AdminTab } from "./dashboard/admin-sidebar";
 import { AdminTopbar } from "./dashboard/admin-topbar";
 import { EmployeesTable } from "./dashboard/employees-table";
@@ -42,6 +42,7 @@ export function AdminDashboard() {
   const [roles, setRoles] = useState<RoleItem[]>([]);
   const [employees, setEmployees] = useState<EmployeeItem[]>([]);
   const [totalEmployees, setTotalEmployees] = useState(0);
+  const [dashboardSummary, setDashboardSummary] = useState<DashboardSummary | undefined>(undefined);
 
   const [apiMessage, setApiMessage] = useState("");
   const [apiError, setApiError] = useState("");
@@ -99,6 +100,16 @@ export function AdminDashboard() {
     setTotalEmployees(employeeResult.data.pagination.total);
   };
 
+  const loadDashboardSummary = async () => {
+    const summaryResult = await adminService.getDashboardSummary();
+    if (!summaryResult.success || !summaryResult.data) {
+      setApiError(summaryResult.message);
+      return;
+    }
+
+    setDashboardSummary(summaryResult.data);
+  };
+
   const bootstrap = async () => {
     if (!requireAdminToken()) return;
 
@@ -106,7 +117,7 @@ export function AdminDashboard() {
     clearAlerts();
 
     const loadedRoles = await loadRoles();
-    await loadEmployees(employeeQuery);
+    await Promise.all([loadEmployees(employeeQuery), loadDashboardSummary()]);
 
     if (loadedRoles.length > 0) {
       setCreatePayload((prev) => ({ ...prev, roleId: loadedRoles[0].roleId }));
@@ -124,7 +135,7 @@ export function AdminDashboard() {
   const handleRefresh = async () => {
     setIsRefreshing(true);
     clearAlerts();
-    await Promise.all([loadRoles(), loadEmployees(employeeQuery)]);
+    await Promise.all([loadRoles(), loadEmployees(employeeQuery), loadDashboardSummary()]);
     setApiMessage("รีเฟรชข้อมูลสำเร็จ");
     setIsRefreshing(false);
   };
@@ -297,6 +308,7 @@ export function AdminDashboard() {
                   totalRoles={roles.length}
                   activeEmployees={activeEmployees}
                   inactiveEmployees={inactiveEmployees}
+                  dashboardSummary={dashboardSummary}
                 />
 
                 <div className="grid gap-5 xl:grid-cols-[0.95fr_1.35fr]">

@@ -1,5 +1,6 @@
 import { isAxiosError } from "axios";
 import axiosInstance from "./axiosInstance";
+import { authSession } from "./authSession";
 
 export type AuthRole = "ADMIN" | "CASHIER" | "CHEF";
 
@@ -16,10 +17,16 @@ export interface LoginResponse {
   accessToken?: string;
   detectedRole?: AuthRole;
   data?: {
+    employeeId?: number;
+    employeeName?: string;
+    roleId?: number;
     accessToken?: string;
     roleName?: AuthRole;
     employee?: {
+      employeeId?: number;
+      employeeName?: string;
       role?: {
+        roleId?: number;
         roleName?: AuthRole;
       };
     };
@@ -69,6 +76,24 @@ const getRoleFromResponse = (data: LoginResponse): AuthRole | undefined => {
   return undefined;
 };
 
+const getEmployeeProfileFromResponse = (data: LoginResponse) => {
+  const employeeId = data.data?.employeeId ?? data.data?.employee?.employeeId;
+  const employeeName = data.data?.employeeName ?? data.data?.employee?.employeeName;
+  const roleId = data.data?.roleId ?? data.data?.employee?.role?.roleId;
+  const roleName = getRoleFromResponse(data);
+
+  if (typeof employeeId !== "number" || typeof employeeName !== "string" || employeeName.trim() === "") {
+    return null;
+  }
+
+  return {
+    employeeId,
+    employeeName,
+    roleId,
+    roleName,
+  };
+};
+
 export const loginService = async (values: LoginPayload): Promise<LoginResponse> => {
   try {
     const response = await axiosInstance.post<LoginResponse>("/api/v1/auth/login", values);
@@ -76,10 +101,14 @@ export const loginService = async (values: LoginPayload): Promise<LoginResponse>
 
     const isSuccess = data.success === true || data.status === "success";
     const detectedRole = getRoleFromResponse(data);
+    const employeeProfile = getEmployeeProfileFromResponse(data);
 
     const token = getTokenFromResponse(data);
     if (token && typeof window !== "undefined") {
       localStorage.setItem(TOKEN_KEY, token);
+      if (employeeProfile) {
+        authSession.setEmployeeProfile(employeeProfile);
+      }
       if (detectedRole) {
         localStorage.setItem("activeRole", detectedRole);
 

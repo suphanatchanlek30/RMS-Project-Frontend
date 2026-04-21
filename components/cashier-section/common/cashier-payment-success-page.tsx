@@ -1,48 +1,38 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { cashierFlowStorage, type StoredCheckoutRecord } from "@/services/cashierFlowStorage";
 import CashierHeader from "../common/cashier-header";
 
 export default function CashierPaymentSuccessPage({
   tableId,
-  customerName = "นาย XXX XXX",
 }: {
   tableId: string;
-  customerName?: string;
 }) {
   const router = useRouter();
+  const [checkoutRecord, setCheckoutRecord] = useState<StoredCheckoutRecord | null>(null);
+
+  useEffect(() => {
+    setCheckoutRecord(cashierFlowStorage.getCheckoutRecord(Number(tableId)));
+  }, [tableId]);
 
   const handlePrint = () => {
     window.print();
   };
 
   const handleOk = () => {
+    cashierFlowStorage.clearCheckoutRecord(Number(tableId));
     router.push("/cashier");
   };
 
   return (
     <div className="min-h-screen bg-gray-200 flex flex-col">
+      <CashierHeader />
 
-      {/* Header */}
-      <div className="bg-[#7B1A1A] flex items-center justify-between px-6 py-4">
-        <div className="bg-white rounded-md px-6 py-2 text-gray-800 font-medium text-sm">
-          {customerName}
-        </div>
-        <button
-          onClick={() => router.back()}
-          className="text-white text-2xl font-bold"
-        >
-          &#x5B;&#x2192;
-        </button>
-      </div>
-
-      {/* Body */}
-      <div className="flex-1 flex items-center justify-center">
-        <div className="bg-gray-100 rounded-2xl px-16 py-12 flex flex-col items-center gap-6 shadow-sm w-[340px]">
-
-          {/* Sparkles + Icon */}
+      <div className="flex-1 flex items-center justify-center px-4 py-8">
+        <div className="w-full max-w-md rounded-3xl bg-gray-100 px-10 py-12 shadow-sm">
           <div className="relative flex items-center justify-center w-36 h-36">
-            {/* sparkles */}
             <span className="absolute top-2 left-4 text-red-300 text-xl">✦</span>
             <span className="absolute top-4 right-2 text-red-200 text-sm">✦</span>
             <span className="absolute bottom-4 left-2 text-red-200 text-sm">✦</span>
@@ -51,7 +41,6 @@ export default function CashierPaymentSuccessPage({
             <span className="absolute top-6 right-8 text-red-100 text-xs">·</span>
             <span className="absolute bottom-6 right-0 text-red-100 text-xs">·</span>
 
-            {/* Circle checkmark */}
             <div className="w-20 h-20 bg-[#C0392B] rounded-full flex items-center justify-center shadow-md">
               <svg width="40" height="40" viewBox="0 0 40 40" fill="none">
                 <path
@@ -65,9 +54,27 @@ export default function CashierPaymentSuccessPage({
             </div>
           </div>
 
-          <p className="text-gray-700 font-medium text-base">Payment Completed</p>
+          <p className="mt-4 text-center text-gray-700 font-medium text-base">Payment Completed</p>
 
-          {/* Buttons */}
+          <div className="mt-6 rounded-2xl bg-white px-5 py-4 text-sm text-black shadow-sm">
+            <div className="flex items-center justify-between gap-4">
+              <span className="text-black/55">Receipt No.</span>
+              <span className="font-bold">{checkoutRecord?.receiptNumber ?? "-"}</span>
+            </div>
+            <div className="mt-3 flex items-center justify-between gap-4">
+              <span className="text-black/55">Payment ID</span>
+              <span className="font-bold">{checkoutRecord?.paymentId ?? "-"}</span>
+            </div>
+            <div className="mt-3 flex items-center justify-between gap-4">
+              <span className="text-black/55">Change</span>
+              <span className="font-bold">{checkoutRecord ? `${checkoutRecord.changeAmount.toFixed(2)} ฿` : "-"}</span>
+            </div>
+            <div className="mt-3 flex items-center justify-between gap-4">
+              <span className="text-black/55">Table Status</span>
+              <span className="font-bold">{checkoutRecord?.tableStatus ?? "AVAILABLE"}</span>
+            </div>
+          </div>
+
           <div className="flex flex-col gap-3 w-full">
             <button
               onClick={handlePrint}
@@ -82,10 +89,8 @@ export default function CashierPaymentSuccessPage({
               OK
             </button>
           </div>
-
         </div>
       </div>
-
     </div>
   );
 }

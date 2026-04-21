@@ -80,6 +80,24 @@ export interface ApiBasicResponse {
   message: string;
 }
 
+export interface DashboardSummary {
+  todaySales: number;
+  todayOrders: number;
+  occupiedTables: number;
+  availableTables: number;
+  topMenu?: {
+    menuId: number;
+    menuName: string;
+    totalSold: number;
+  };
+}
+
+export interface DashboardSummaryResponse {
+  success: boolean;
+  message: string;
+  data?: DashboardSummary;
+}
+
 const getAdminToken = (): string | null => {
   if (typeof window === "undefined") return null;
   return localStorage.getItem(ADMIN_TOKEN_KEY);
@@ -246,6 +264,20 @@ export const adminService = {
       return {
         success: false,
         message: getErrorMessage(error, "ออกจากระบบไม่สำเร็จ"),
+      };
+    }
+  },
+
+  async getDashboardSummary(): Promise<DashboardSummaryResponse> {
+    try {
+      const response = await axiosInstance.get<DashboardSummaryResponse>(`${API_PREFIX}/dashboard/summary`, {
+        headers: getAdminHeaders(),
+      });
+      return response.data;
+    } catch (error) {
+      return {
+        success: false,
+        message: getErrorMessage(error, "ดึงข้อมูล dashboard summary ไม่สำเร็จ"),
       };
     }
   },

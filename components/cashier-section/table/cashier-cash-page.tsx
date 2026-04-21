@@ -1,48 +1,58 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { cashierFlowStorage } from "@/services/cashierFlowStorage";
+import { cashierService, type CheckoutSummary, type TableSession } from "@/services/cashier.service";
 import CashierHeader from "../common/cashier-header";
-
-type BillItem = {
-  name: string;
-  qty: number;
-  price: number;
-};
-
-const billItems: BillItem[] = [
-  {
-    name: "กะเพรา (หมูสับ / ไก่ / หมูกรอบ / กะหล่ำ) ราดข้าว",
-    qty: 1,
-    price: 50,
-  },
-  {
-    name: "กะเพรา (หมูสับ / ไก่ / หมูกรอบ / กะหล่ำ) ราดข้าว",
-    qty: 1,
-    price: 50,
-  },
-  {
-    name: "น้ำเปล่า (เย็น / น้ำแข็งเปล่า)",
-    qty: 2,
-    price: 10,
-  },
-];
 
 export default function CashierCashPage({ tableId }: { tableId: string }) {
   const router = useRouter();
-  const [paidText, setPaidText] = useState("200");
+  const [paidText, setPaidText] = useState("0");
+  const [session, setSession] = useState<TableSession | null>(null);
+  const [checkoutSummary, setCheckoutSummary] = useState<CheckoutSummary | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const tableName = `T${String(tableId).padStart(2, "0")}`;
-  const now = new Date();
-  const hour = now.getHours() % 12 || 12;
-  const minute = String(now.getMinutes()).padStart(2, "0");
-  const ampm = now.getHours() >= 12 ? "PM" : "AM";
-  const timeLabel = `${tableName} : ${hour}.${minute} ${ampm}`;
-  const totalAmount = billItems.reduce((sum, item) => sum + item.qty * item.price, 0);
+  useEffect(() => {
+    const loadCheckout = async () => {
+      setIsLoading(true);
+      setErrorMessage(null);
+
+      const sessionResponse = await cashierService.getCurrentSession(Number(tableId));
+      if (!sessionResponse.success || !sessionResponse.data) {
+        setErrorMessage(sessionResponse.message);
+        setIsLoading(false);
+        return;
+      }
+
+      setSession(sessionResponse.data);
+
+      const checkoutResponse = await cashierService.getCheckoutSummary(sessionResponse.data.sessionId);
+      if (!checkoutResponse.success || !checkoutResponse.data) {
+        setErrorMessage(checkoutResponse.message);
+        setIsLoading(false);
+        return;
+      }
+
+      setCheckoutSummary(checkoutResponse.data);
+      setPaidText(String(Math.ceil(checkoutResponse.data.bill.totalAmount)));
+      setIsLoading(false);
+    };
+
+    void loadCheckout();
+  }, [tableId]);
+
+  const tableName = checkoutSummary?.tableNumber ?? `T${String(tableId).padStart(2, "0")}`;
+  const timeLabel = session
+    ? `${tableName} : ${new Date(session.startTime).toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" })}`
+    : tableName;
+  const totalAmount = checkoutSummary?.bill.totalAmount ?? 0;
 
   const paidAmount = Number(paidText || 0);
   const changeAmount = Math.max(0, paidAmount - totalAmount);
-  const dateLabel = `${String(now.getDate()).padStart(2, "0")}/${String(now.getMonth() + 1).padStart(2, "0")}/${String(now.getFullYear()).slice(-2)}`;
+  const dateLabel = new Date().toLocaleDateString("th-TH");
 
   const keypadValues = [50, 100, 500, 1000];
   const digits = ["1", "2", "3", "4", "5", "6", "7", "8", "9", ".", "0", "DEL"];
@@ -69,8 +79,37 @@ export default function CashierCashPage({ tableId }: { tableId: string }) {
     setPaidText(String(value));
   };
 
-  const handleConfirmPay = () => {
-  router.push(`/cashier/table/${tableId}/payment-success`);
+  const handleConfirmPay = async () => {
+    if (!session || !checkoutSummary) {
+      setErrorMessage("ไม่พบข้อมูล session สำหรับชำระเงิน");
+      return;
+    }
+
+    const cashMethod = checkoutSummary.paymentMethods.find((method) => method.methodName === "CASH");
+    if (!cashMethod) {
+      setErrorMessage("ไม่พบวิธีชำระเงินแบบเงินสด");
+      return;
+    }
+
+    setIsSubmitting(true);
+    setErrorMessage(null);
+
+    const response = await cashierService.submitCheckout({
+      sessionId: session.sessionId,
+      paymentMethodId: cashMethod.paymentMethodId,
+      receivedAmount: paidAmount,
+    });
+
+    if (!response.success || !response.data) {
+      setErrorMessage(response.message);
+      setIsSubmitting(false);
+      return;
+    }
+
+    cashierFlowStorage.setCheckoutRecord(Number(tableId), response.data);
+    cashierFlowStorage.clearQrSession(session.sessionId);
+    setIsSubmitting(false);
+    router.push(`/cashier/table/${tableId}/payment-success`);
   };
 
   return (
@@ -79,6 +118,10 @@ export default function CashierCashPage({ tableId }: { tableId: string }) {
 
       <div className="flex justify-center items-center mt-12 px-4 pb-10">
         <div className="bg-[#d7d7d7] max-w-[1040px] w-full rounded-3xl shadow-2xl p-5 mx-auto">
+          {errorMessage ? (
+            <div className="mb-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{errorMessage}</div>
+          ) : null}
+
           <div className="grid gap-4 min-w-0 xl:grid-cols-[1.05fr_0.95fr] max-w-[900px] mx-auto">
             <div className="bg-white rounded-[2rem] p-4 shadow-lg min-w-0">
               <div className="text-center mb-6">
@@ -90,15 +133,18 @@ export default function CashierCashPage({ tableId }: { tableId: string }) {
 
               <div className="text-base font-semibold mb-5">{timeLabel}</div>
               <div className="space-y-4">
-                {billItems.map((item, index) => (
-                  <div key={index} className="flex items-start justify-between gap-4">
+                {isLoading ? (
+                  Array.from({ length: 3 }, (_, index) => <div key={index} className="h-14 animate-pulse rounded-xl bg-black/8" />)
+                ) : (
+                  checkoutSummary?.bill.items.map((item) => (
+                  <div key={item.orderItemId} className="flex items-start justify-between gap-4">
                     <div className="min-w-[0]">
-                      <div className="font-semibold text-sm sm:text-base">{item.name}</div>
-                      <div className="text-xs text-gray-500 mt-1">x{item.qty}</div>
+                      <div className="font-semibold text-sm sm:text-base">{item.menuName}</div>
+                      <div className="text-xs text-gray-500 mt-1">x{item.quantity}</div>
                     </div>
-<div className="text-right font-semibold text-sm sm:text-base">{(item.qty * item.price).toFixed(2)}</div>
+                    <div className="text-right font-semibold text-sm sm:text-base">{item.lineTotal.toFixed(2)}</div>
                   </div>
-                ))}
+                ))) }
               </div>
 
               <div className="border-t border-gray-200 pt-5 mt-5 text-base font-bold flex items-center justify-between">
@@ -148,10 +194,10 @@ export default function CashierCashPage({ tableId }: { tableId: string }) {
 
               <button
                 type="button"
-                onClick={() => router.push(`/cashier/table/${tableId}`)}
+                onClick={() => setPaidText(String(Math.ceil(totalAmount)))}
                 className="mt-5 w-full rounded-3xl bg-red-700 px-5 py-3 text-xl font-bold uppercase text-white shadow-lg"
               >
-                ENTER
+                Use Exact Amount
               </button>
             </div>
           </div>
@@ -159,9 +205,10 @@ export default function CashierCashPage({ tableId }: { tableId: string }) {
           <div className="flex justify-center mt-6">
             <button
                 onClick={handleConfirmPay}
-                className="bg-white text-black text-2xl font-bold rounded-3xl px-24 py-4 shadow-lg hover:bg-gray-50 transition-colors"
+                disabled={isLoading || isSubmitting}
+                className="bg-white text-black text-2xl font-bold rounded-3xl px-24 py-4 shadow-lg hover:bg-gray-50 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
               >
-                Confirm pay
+                {isSubmitting ? "Processing..." : "Confirm pay"}
             </button>
           </div>
         </div>

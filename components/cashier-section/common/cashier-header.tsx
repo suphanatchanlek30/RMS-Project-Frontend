@@ -1,11 +1,26 @@
 "use client";
 
+import { useMemo } from "react";
 import { LogOut } from "lucide-react";
-import { CASHIER_NAME } from "@/lib/constants/cashier.constants";
+import axiosInstance from "@/services/axiosInstance";
+import { authSession } from "@/services/authSession";
+import { DEFAULT_CASHIER_NAME } from "@/lib/constants/cashier.constants";
 import { useRouter } from "next/navigation";
 
 export default function CashierHeader() {
   const router = useRouter();
+  const cashierName = useMemo(() => authSession.getEmployeeProfile()?.employeeName ?? DEFAULT_CASHIER_NAME, []);
+
+  const handleLogout = async () => {
+    try {
+      await axiosInstance.post("/api/v1/auth/logout", {});
+    } catch {
+      // Best effort logout. Client state is cleared regardless of API outcome.
+    } finally {
+      authSession.clearClientAuthState();
+      router.push("/auth");
+    }
+  };
 
   return (
     <div className="relative">
@@ -25,11 +40,11 @@ export default function CashierHeader() {
         <div className="relative z-10 flex justify-between w-full items-center">
 
           <div className="bg-(--bg) text-black px-6 py-2 rounded-lg shadow-md">
-            {CASHIER_NAME}
+            {cashierName}
           </div>
 
           <button
-            onClick={() => router.push("/auth")}
+            onClick={handleLogout}
             className="text-white hover:scale-110 transition"
           >
             <LogOut size={36} strokeWidth={2} />
