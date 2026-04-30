@@ -1,0 +1,12 @@
+services:
+  frontend:
+    build: .
+    container_name: rms-frontend
+    ports:
+      - "3000:3000"
+    volumes:
+      - .:/app
+      - /app/node_modules
+    environment:
+      - NEXT_PUBLIC_URL=http://localhost:8080
+      - NEXT_PUBLIC_LOGIN_PATH=/auth
