@@ -164,3 +164,30 @@ npm run build
 - อย่าแก้ UI กระจายหลายไฟล์โดยไม่จำเป็น
 - ถ้า logic หรือ UI ใช้ซ้ำหลายจุด ให้ย้ายออกเป็น component หรือ constant
 - ถ้าต้องเพิ่มไฟล์ใหม่ ให้เลือกโฟลเดอร์ให้ตรงกับหน้าที่ของไฟล์ก่อนเสมอ
+
+## Run Docker แบบแยกโฟลเดอร์ (Frontend/Backend คนละ repo)
+
+โฟลเดอร์ frontend นี้มี `docker-compose.yml` ที่ออกแบบมาให้ต่อเข้ากับ network ของ backend ได้โดยตรง
+
+1. เปิด backend ขึ้นก่อน (ใน repo backend) เพื่อให้ network backend ถูกสร้าง
+2. ที่ repo frontend รันคำสั่งต่อไปนี้
+
+```bash
+docker compose build --no-cache
+docker compose up -d
+```
+
+3. ตรวจสอบว่า frontend join network backend สำเร็จ
+
+```bash
+docker inspect rms-frontend --format '{{range $k,$v := .NetworkSettings.Networks}}{{$k}} {{end}}'
+```
+
+ค่า env สำคัญ
+
+- `NEXT_PUBLIC_URL` / `NEXT_PUBLIC_API_URL`: URL ที่ browser จะยิง API (ปกติใช้ `http://localhost:8080`)
+- `INTERNAL_API_URL`: URL ภายใน container สำหรับฝั่ง server (`http://rms-api:8080`)
+- `BACKEND_DOCKER_NETWORK`: ชื่อ network backend ที่ frontend จะเข้าไป join (ค่า default คือ `rms-project-backend_default`)
+- `FRONTEND_PORT`: พอร์ตฝั่งเครื่อง host (default `3000`) ถ้าพอร์ตชนให้ตั้งเป็น `3001` หรือพอร์ตอื่น
+
+หมายเหตุ: ถ้า backend ใช้ชื่อ network อื่น ให้เปลี่ยน `BACKEND_DOCKER_NETWORK` ให้ตรงก่อน `docker compose up`

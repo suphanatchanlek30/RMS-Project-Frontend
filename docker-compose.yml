@@ -1,12 +1,24 @@
 services:
-  frontend:
-    build: .
+  rms-frontend:
     container_name: rms-frontend
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_URL: ${NEXT_PUBLIC_URL:-http://localhost:8080}
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8080}
+        NEXT_PUBLIC_LOGIN_PATH: ${NEXT_PUBLIC_LOGIN_PATH:-/auth}
     ports:
-      - "3000:3000"
-    volumes:
-      - .:/app
-      - /app/node_modules
+      - "${FRONTEND_PORT:-3000}:3000"
     environment:
-      - NEXT_PUBLIC_URL=http://localhost:8080
-      - NEXT_PUBLIC_LOGIN_PATH=/auth
+      NODE_ENV: production
+      INTERNAL_API_URL: ${INTERNAL_API_URL:-http://rms-api:8080}
+      NEXT_PUBLIC_LOGIN_PATH: ${NEXT_PUBLIC_LOGIN_PATH:-/auth}
+    networks:
+      - backend_shared
+    restart: unless-stopped
+
+networks:
+  backend_shared:
+    external: true
+    name: ${BACKEND_DOCKER_NETWORK:-rms-project-backend_default}
