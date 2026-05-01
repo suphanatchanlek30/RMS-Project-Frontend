@@ -4,7 +4,9 @@ const TOKEN_KEY = "token";
 const ADMIN_TOKEN_KEY = "adminToken";
 const CASHIER_TOKEN_KEY = "cashierToken";
 const CHEF_TOKEN_KEY = "chefToken";
-const API_BASE_URL = process.env.NEXT_PUBLIC_URL ?? process.env.NEXT_PUBLIC_API_URL ?? "";
+const BROWSER_API_BASE_URL = process.env.NEXT_PUBLIC_URL ?? process.env.NEXT_PUBLIC_API_URL ?? "";
+const SERVER_API_BASE_URL = process.env.INTERNAL_API_URL ?? BROWSER_API_BASE_URL;
+const API_BASE_URL = typeof window === "undefined" ? SERVER_API_BASE_URL : BROWSER_API_BASE_URL;
 const LOGIN_PATH = process.env.NEXT_PUBLIC_LOGIN_PATH ?? "/auth";
 
 const axiosInstance = axios.create({
